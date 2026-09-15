@@ -32,4 +32,4 @@
    atualize a linha abaixo e publique. A chave velha morre na hora.
    ============================================================ */
 
-window.ADM_CHAVE = '';
+window.ADM_CHAVE = '2FF4CB030B45481CBF4E';

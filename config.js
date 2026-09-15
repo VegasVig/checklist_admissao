@@ -14,7 +14,7 @@
 window.ADM_CONFIG = {
 
   /* URL do aplicativo da web do Admissao.gs, terminada em /exec. */
-  url: '',
+  url: 'https://script.google.com/macros/s/AKfycby2RnV1gVcLrFGYBEQsLtLrXcP9swz_q7cj3xbsfm95HdC2-kBrNiX5CaobmFzRcqRleA/exec',
 
   /* Preenchimento automático do formulário do RH. Nada secreto:
      são dados que já saem impressos na ficha do candidato. */
