@@ -24,7 +24,13 @@
 var CFG = {
   NOME_PLANILHA: 'Vegas — Admissões',
   /* meses até a ficha entrar no relatório de expurgo da LGPD */
-  RETENCAO_MESES: 24
+  RETENCAO_MESES: 24,
+
+  /* Usuário e senha criados na primeira vez que instalar() roda.
+     Depois disso, mude pela função trocarSenha() — editar aqui
+     não muda nada, porque a senha já foi gravada. */
+  USUARIO_INICIAL: 'admin',
+  SENHA_INICIAL: 'Vegas4747@'
 };
 
 var COLUNAS = [
@@ -58,17 +64,28 @@ function instalar() {
     props.setProperty('CHAVE_RH', chave);
   }
 
+  var us = lerUsuarios_();
+  var criouUsuario = false;
+  if (!Object.keys(us).length) {
+    us[CFG.USUARIO_INICIAL] = { hash: resumo_(CFG.SENHA_INICIAL), nome: 'Administrador' };
+    gravarUsuarios_(us);
+    criouUsuario = true;
+  }
+
   var msg =
     '\n============================================================\n' +
     ' ADMISSÕES — INSTALAÇÃO CONCLUÍDA\n' +
     '============================================================\n' +
-    ' CHAVE DO RH : ' + chave + '\n' +
     ' PLANILHA    : ' + ss.getUrl() + '\n' +
+    ' USUÁRIO     : ' + CFG.USUARIO_INICIAL + '\n' +
+    ' SENHA       : ' + (criouUsuario ? CFG.SENHA_INICIAL : '(já existia, não foi mexida)') + '\n' +
+    ' CHAVE DO RH : ' + chave + '\n' +
     '------------------------------------------------------------\n' +
     ' Agora publique: Implantar > Nova implantação >\n' +
     ' Aplicativo da Web, executar como Eu, acesso Qualquer pessoa.\n' +
-    ' A URL /exec vai em js/config.js.\n' +
-    ' A chave acima NÃO vai no config.js: digite no painel.\n' +
+    ' A URL /exec vai em js/config.js. Só ela.\n' +
+    ' No painel, entre com o usuário e a senha acima.\n' +
+    ' Para trocar a senha: trocarSenha(\'admin\', \'NovaSenha123\')\n' +
     '============================================================\n';
   Logger.log(msg);
   try { SpreadsheetApp.getUi().alert(msg); } catch (e) {}
@@ -161,6 +178,7 @@ function doPost(e) {
     /* ações abertas: o candidato não tem chave, tem o link */
     if (acao === 'ler')    return json_(lerFicha_(dados.id));
     if (acao === 'salvar') return json_(salvarFicha_(dados.id, dados.dados));
+    if (acao === 'login')  return json_(login_(dados.usuario, dados.senha));
 
     /* daqui para baixo, só com a chave do RH */
     if (!conferirChave_(dados.chave)) return json_({ ok: false, erro: 'Chave do RH inválida.' });
@@ -244,6 +262,104 @@ function iso_(v) {
   if (!v) return '';
   if (v instanceof Date) return v.toISOString();
   return String(v);
+}
+
+/* ============================================================
+   USUÁRIOS DO PAINEL
+
+   A senha não fica guardada em lugar nenhum: o que se guarda é
+   o resumo SHA-256 dela com um sal próprio desta instalação.
+   Se alguém abrir a planilha ou as propriedades do script, vê o
+   resumo, não a senha. E o navegador nunca recebe a chave do RH
+   sem antes acertar usuário e senha.
+   ============================================================ */
+
+function sal_() {
+  var p = PropertiesService.getScriptProperties();
+  var s = p.getProperty('SAL');
+  if (!s) { s = Utilities.getUuid(); p.setProperty('SAL', s); }
+  return s;
+}
+
+function resumo_(senha) {
+  var bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256, sal_() + '|' + senha, Utilities.Charset.UTF_8);
+  var hex = '';
+  for (var i = 0; i < bytes.length; i++) {
+    hex += ('0' + (bytes[i] & 0xFF).toString(16)).slice(-2);
+  }
+  return hex;
+}
+
+function lerUsuarios_() {
+  var t = PropertiesService.getScriptProperties().getProperty('USUARIOS');
+  if (!t) return {};
+  try { return JSON.parse(t); } catch (e) { return {}; }
+}
+
+function gravarUsuarios_(u) {
+  PropertiesService.getScriptProperties().setProperty('USUARIOS', JSON.stringify(u));
+}
+
+function login_(usuario, senha) {
+  var nome = String(usuario || '').trim().toLowerCase();
+  if (!nome || !senha) return { ok: false, erro: 'Informe usuário e senha.' };
+
+  var us = lerUsuarios_();
+  var u = us[nome];
+
+  /* a espera vale tanto para usuário inexistente quanto para senha
+     errada: sem ela, o tempo de resposta diria qual dos dois é */
+  if (!u || u.hash !== resumo_(senha)) {
+    Utilities.sleep(800);
+    registrar_('login negado', '', nome);
+    return { ok: false, erro: 'Usuário ou senha incorretos.' };
+  }
+
+  registrar_('login', '', nome);
+  return {
+    ok: true,
+    usuario: nome,
+    nome: u.nome || nome,
+    token: PropertiesService.getScriptProperties().getProperty('CHAVE_RH')
+  };
+}
+
+/** Cria ou troca a senha de um usuário do painel.
+ *  Rode assim, direto no editor do Apps Script:
+ *      trocarSenha('admin', 'NovaSenhaForte123')            */
+function trocarSenha(usuario, novaSenha) {
+  var nome = String(usuario || '').trim().toLowerCase();
+  if (!nome) throw new Error('Informe o usuário.');
+  if (!novaSenha || String(novaSenha).length < 8) {
+    throw new Error('A senha precisa de pelo menos 8 caracteres.');
+  }
+  var us = lerUsuarios_();
+  var novo = !us[nome];
+  us[nome] = { hash: resumo_(novaSenha), nome: (us[nome] && us[nome].nome) || nome };
+  gravarUsuarios_(us);
+  var m = novo ? 'Usuário ' + nome + ' criado.' : 'Senha de ' + nome + ' trocada.';
+  Logger.log(m);
+  return m;
+}
+
+/** Tira um usuário do painel. */
+function removerUsuario(usuario) {
+  var nome = String(usuario || '').trim().toLowerCase();
+  var us = lerUsuarios_();
+  if (!us[nome]) { Logger.log('Não existe usuário ' + nome + '.'); return; }
+  delete us[nome];
+  gravarUsuarios_(us);
+  Logger.log('Usuário ' + nome + ' removido.');
+}
+
+/** Lista quem tem acesso ao painel. Mostra os nomes, nunca as senhas. */
+function verUsuarios() {
+  var us = lerUsuarios_();
+  var nomes = Object.keys(us);
+  var m = nomes.length ? 'Usuários do painel: ' + nomes.join(', ') : 'Nenhum usuário cadastrado.';
+  Logger.log(m);
+  return m;
 }
 
 /* ============================================================

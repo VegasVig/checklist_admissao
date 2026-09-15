@@ -10,11 +10,27 @@ window.API = {
     return (window.ADM_CONFIG && window.ADM_CONFIG.url) || localStorage.getItem('adm_url') || '';
   },
 
-  /* A chave vem do js/chave.js, que só o painel carrega. Se
-     estiver em branco, cai no que foi digitado no aparelho. */
+  /* Atalho opcional: chave escrita em js/chave.js entra sem login.
+     Em branco, o painel pede usuário e senha. */
   chaveFixa: function () { return (window.ADM_CHAVE || '').trim(); },
-  chaveRh: function () { return this.chaveFixa() || localStorage.getItem('adm_chave') || ''; },
-  guardarChave: function (k) { localStorage.setItem('adm_chave', k.trim()); },
+
+  /* O token devolvido pelo login é a própria chave do RH. Ele fica
+     na sessão do navegador, e some quando a aba fecha. */
+  sessao: function () {
+    try { return JSON.parse(sessionStorage.getItem('adm_sessao')) || null; }
+    catch (e) { return null; }
+  },
+  abrirSessao: function (s) { sessionStorage.setItem('adm_sessao', JSON.stringify(s)); },
+  fecharSessao: function () { sessionStorage.removeItem('adm_sessao'); },
+
+  chaveRh: function () {
+    var s = this.sessao();
+    return this.chaveFixa() || (s && s.token) || '';
+  },
+  quem: function () {
+    var s = this.sessao();
+    return this.chaveFixa() ? '' : (s ? (s.nome || s.usuario) : '');
+  },
   guardarUrl: function (u) { localStorage.setItem('adm_url', u.trim()); },
 
   configurada: function () { return !!this.url(); },
@@ -43,6 +59,15 @@ window.API = {
       if (e.message === 'Failed to fetch') throw new Error('Sem conexão com a planilha. Verifique a internet e o endereço publicado.');
       throw e;
     });
+  },
+
+  entrar: function (usuario, senha) {
+    var eu = this;
+    return this.chamar('login', { usuario: usuario, senha: senha }, false)
+      .then(function (r) {
+        eu.abrirSessao({ token: r.token, usuario: r.usuario, nome: r.nome });
+        return r;
+      });
   },
 
   ping:      function ()          { return this.chamar('ping', {}, true); },

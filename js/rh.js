@@ -11,6 +11,8 @@ var ORDEM = { col: 'criadaEm', desc: true };
 document.addEventListener('DOMContentLoaded', function () {
   $('logoTopo').src = window.VEGAS_LOGO.branca;
 
+  atualizarTopo();
+
   $('abas').addEventListener('click', function (e) {
     var b = e.target.closest('[data-aba]'); if (!b) return;
     ABA = b.dataset.aba;
@@ -23,7 +25,15 @@ document.addEventListener('DOMContentLoaded', function () {
   render();
 });
 
+function atualizarTopo() {
+  var el = document.querySelector('.topo .t');
+  if (!el) return;
+  var quem = window.API.quem();
+  el.textContent = quem ? 'Admissões — ' + quem : 'Admissões';
+}
+
 function render() {
+  atualizarTopo();
   if (!window.API.autenticado()) { $('abas').hidden = true; return telaAcesso(); }
   $('abas').hidden = false;
   if (ABA === 'nova') telaNova(); else telaFichas();
@@ -55,36 +65,55 @@ function telaAcesso() {
     return;
   }
   $('tela').innerHTML =
-    '<div style="max-width:520px;margin:40px auto">' +
+    '<div style="max-width:440px;margin:56px auto">' +
     '<h1 style="font-size:26px;margin:0 0 6px;letter-spacing:-.02em">Entrar no painel</h1>' +
-    '<p style="color:var(--fraco);margin:0 0 24px">A chave fica guardada só neste aparelho. ' +
-    'Ela não vai para o link do candidato.</p>' +
+    '<p style="color:var(--fraco);margin:0 0 26px">Painel de admissões da Vegas. ' +
+    'Só quem trabalha com as fichas entra aqui.</p>' +
 
     (temUrl ? '' :
       '<div class="campo cheia" style="margin-bottom:16px"><label for="inUrl">Endereço do aplicativo da web</label>' +
-      '<p class="ajuda">Termina em /exec. Vem do Admissao.gs publicado.</p>' +
+      '<p class="ajuda">Termina em /exec. Some daqui quando você preencher o js/config.js.</p>' +
       '<input type="text" id="inUrl" value="' + esc(localStorage.getItem('adm_url') || '') + '"></div>') +
 
-    '<div class="campo cheia"><label for="inChave">Chave do RH</label>' +
-    '<p class="ajuda">A função instalar() mostra a chave no registro de execução.</p>' +
-    '<input type="text" id="inChave" autocomplete="off"></div>' +
-    '<div class="btn-linha" style="margin-top:18px"><button class="btn" id="btnEntrar">Entrar</button></div>' +
+    '<div class="campo cheia" style="margin-bottom:14px"><label for="inUsuario">Usuário</label>' +
+    '<input type="text" id="inUsuario" autocomplete="username" autocapitalize="none" spellcheck="false"></div>' +
+
+    '<div class="campo cheia"><label for="inSenha">Senha</label>' +
+    '<input type="password" id="inSenha" autocomplete="current-password"></div>' +
+
+    '<div class="btn-linha" style="margin-top:20px"><button class="btn" id="btnEntrar">Entrar</button></div>' +
     '<div id="acessoMsg"></div></div>';
 
-  $('btnEntrar').addEventListener('click', function () {
+  function entrar() {
     var u = $('inUrl'); if (u) window.API.guardarUrl(u.value);
-    var k = $('inChave').value.trim();
-    if (!k) return ($('acessoMsg').innerHTML = '<div class="aviso erro">Digite a chave.</div>');
-    window.API.guardarChave(k);
-    $('acessoMsg').innerHTML = '<div class="aviso info">Conferindo…</div>';
-    window.API.ping().then(function () {
-      $('acessoMsg').innerHTML = '';
+    var usuario = $('inUsuario').value.trim();
+    var senha = $('inSenha').value;
+
+    if (!usuario || !senha) {
+      $('acessoMsg').innerHTML = '<div class="aviso erro">Preencha usuário e senha.</div>';
+      ($('inUsuario').value ? $('inSenha') : $('inUsuario')).focus();
+      return;
+    }
+
+    var b = $('btnEntrar');
+    b.disabled = true; b.textContent = 'Entrando…';
+    $('acessoMsg').innerHTML = '';
+
+    window.API.entrar(usuario, senha).then(function () {
       render();
     }).catch(function (e) {
-      window.API.guardarChave('');
+      b.disabled = false; b.textContent = 'Entrar';
       $('acessoMsg').innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
+      $('inSenha').value = '';
+      $('inSenha').focus();
     });
+  }
+
+  $('btnEntrar').addEventListener('click', entrar);
+  ['inUsuario', 'inSenha'].forEach(function (id) {
+    $(id).addEventListener('keydown', function (ev) { if (ev.key === 'Enter') entrar(); });
   });
+  $('inUsuario').focus();
 }
 
 /* ============================================================
@@ -222,7 +251,7 @@ function telaFichas() {
         ? '<p class="ajuda">A chave está escrita em <b>js/chave.js</b>. Rode <b>verChave</b> no Apps Script, ' +
           'confira, corrija o arquivo e publique.</p>' +
           '<div class="btn-linha"><button class="btn sec" id="btnRetentar">Tentar de novo</button></div>'
-        : '<div class="btn-linha"><button class="btn sec" id="btnSair">Trocar a chave</button></div>');
+        : '<div class="btn-linha"><button class="btn sec" id="btnSair">Entrar de novo</button></div>');
     if ($('btnSair')) $('btnSair').addEventListener('click', sair);
     if ($('btnRetentar')) $('btnRetentar').addEventListener('click', telaFichas);
   });
@@ -462,8 +491,8 @@ function apagar(id, nome) {
 }
 
 function sair() {
-  if (!confirm('Sair do painel neste aparelho?')) return;
-  window.API.guardarChave('');
+  if (!confirm('Sair do painel?')) return;
+  window.API.fecharSessao();
   ABA = 'nova';
   render();
 }

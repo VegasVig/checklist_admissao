@@ -17,7 +17,7 @@ chave própria. Não precisa de nada de fora para funcionar.
 | `ficha.html` | A tela que o candidato recebe pelo link. |
 | `Admissao.gs` | Backend no Apps Script. Cria a planilha e responde às duas telas. |
 | `js/config.js` | Endereço da planilha e dados fixos da empresa. **Você edita este.** |
-| `js/chave.js` | A chave do painel. **Você edita este.** Só o painel carrega. |
+| `js/chave.js` | Atalho para abrir o painel sem login. Vem em branco. Só o painel carrega. |
 | `js/campos.js` | As perguntas da ficha. **Você edita este** para incluir ou tirar itens. |
 | `js/ficha.js` | Montagem, validação e envio da ficha do candidato. |
 | `js/rh.js` | Painel do RH. |
@@ -75,34 +75,53 @@ Use um repositório separado do resto. Assim o endereço da ficha é curto, o qu
 importa quando ele vai por WhatsApp, e você pode mexer numa coisa sem republicar
 a outra.
 
-### 3. A chave do painel
+### 3. Entrar no painel
 
-Abra `js/chave.js` e cole a chave que o `instalar()` mostrou:
+Abra o endereço do site e entre com:
+
+| Usuário | Senha |
+|---|---|
+| `admin` | `Vegas4747@` |
+
+**Troque essa senha no primeiro dia.** No editor do Apps Script, escolha a função
+`trocarSenha`, e rode assim:
+
+```js
+trocarSenha('admin', 'SuaNovaSenhaAqui')
+```
+
+Mínimo de 8 caracteres. Editar a `SENHA_INICIAL` no topo do `Admissao.gs` não muda
+nada depois da instalação, porque a senha já foi gravada.
+
+**Mais gente no painel.** A mesma função cria usuário novo:
+
+```js
+trocarSenha('marcia', 'SenhaDaMarcia123')
+```
+
+E para tirar o acesso de alguém: `removerUsuario('marcia')`. Para ver quem tem
+acesso: `verUsuarios()` — mostra os nomes, nunca as senhas.
+
+**Como a senha é guardada.** Não é. O que fica gravado é o resumo SHA-256 dela com
+um sal próprio da sua instalação. Quem abrir as propriedades do script vê o resumo,
+não a senha. E o navegador só recebe a chave de acesso às fichas depois de acertar
+usuário e senha; ela fica na sessão da aba e some quando você fecha o navegador.
+
+### Atalho sem login
+
+Se algum dia você quiser que o painel abra direto, sem pedir nada, cole a chave do
+RH em `js/chave.js`:
 
 ```js
 window.ADM_CHAVE = 'A3F91C77B2E04D58C1A9';
 ```
 
-Pronto. O painel abre direto, em qualquer aparelho, sem pedir nada a ninguém.
+O login some. Em compensação, quem chegar ao endereço do painel entra. Só faz
+sentido se o endereço for conhecido por pouca gente. Deixando em branco, que é como
+vem, o painel pede usuário e senha.
 
-**Por que a chave fica num arquivo separado do `config.js`.** O `config.js` é
-carregado pelas duas telas, a do painel e a do candidato. O `chave.js` é carregado
-só pelo painel. Se a chave estivesse no `config.js`, ela iria junto na ficha do
-candidato, e qualquer um deles que abrisse o código-fonte da própria ficha leria
-CPF, conta bancária e nome de filho de todos os outros candidatos. Então: URL no
-`config.js`, chave no `chave.js`. Não junte os dois.
-
-**O que isso não resolve.** Num site do GitHub Pages todo arquivo é público. Quem
-souber o endereço do `chave.js` consegue baixá-lo. O que a separação garante é que o
-candidato não recebe a chave sem querer, junto com a ficha dele. Manter o painel num
-repositório separado da ficha ajuda mais, porque aí o candidato nunca vê nem o
-endereço do painel.
-
-Com a chave, o que alguém consegue é ler e mexer nas fichas. Não entra na sua conta
-Google nem em nada fora desta planilha.
-
-**Prefere não colar a chave?** Deixe `window.ADM_CHAVE = ''`. O painel volta a pedir
-a chave uma vez por aparelho, e ela fica guardada só ali.
+Note que a chave vai em `js/chave.js`, nunca no `config.js`. O `config.js` é
+carregado também pela ficha do candidato; o `chave.js`, só pelo painel.
 
 ---
 
@@ -174,8 +193,10 @@ Esta ficha guarda dado sensível de pessoa física. Vale tratar com cuidado.
 **O link é a senha.** Cada ficha tem um código aleatório de 36 caracteres. Quem tem o
 link vê aquela ficha, e só aquela. Mande pelo WhatsApp do candidato, não em grupo.
 
-**O painel é protegido pela chave.** Trocou alguém do RH? Rode `gerarNovaChave` no
-Apps Script, cole a nova em `js/chave.js` e publique. A chave velha morre na hora.
+**O painel é protegido por usuário e senha.** Cada pessoa do RH com o seu próprio
+usuário: o registro de acesso na aba Log mostra quem entrou e quando. Saiu alguém,
+`removerUsuario('nome')` e acabou. Se desconfiar que a senha vazou, troque com
+`trocarSenha`.
 
 **A planilha é o cofre.** Compartilhe com o mínimo de pessoas. Ela tem CPF, conta
 bancária e nome de filho menor.
@@ -194,7 +215,8 @@ link. Use quando a vaga cair.
 
 | Sintoma | O que é |
 |---|---|
-| *Chave do RH inválida* | Rode `verChave` no Apps Script e compare com o que está em `js/chave.js`. Depois de `gerarNovaChave`, atualize o arquivo e publique. |
+| *Usuário ou senha incorretos* | Rode `verUsuarios()` no Apps Script para ver quem existe, e `trocarSenha('admin','NovaSenha123')` para redefinir. |
+| *Chave do RH inválida* | Acontece se você usou o atalho do `js/chave.js` e a chave mudou. Rode `verChave` e atualize o arquivo. |
 | *Falta o endereço da planilha* | A chave está preenchida mas a URL não. Cole a URL `/exec` em `js/config.js`. |
 | *Ficha não encontrada* no link do candidato | A ficha foi apagada no painel, ou o link veio cortado pelo WhatsApp. Gere de novo. |
 | *O servidor respondeu em formato inesperado* | A publicação não está como "Qualquer pessoa". Refaça o passo 6. |
@@ -211,5 +233,5 @@ link. Use quando a vaga cair.
    Você vê o que o candidato vê e descobre o que falta perguntar.
 2. Leia as quatro declarações com o jurídico. Elas são o que sustenta a ficha se a
    admissão der problema depois.
-3. Guarde o endereço do painel entre quem precisa dele. Com a chave no `chave.js`,
-   quem tem o endereço tem o acesso.
+3. Troque a senha do `admin` e crie um usuário para cada pessoa do RH. Senha
+   compartilhada não diz quem fez o quê.

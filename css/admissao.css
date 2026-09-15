@@ -46,6 +46,11 @@ body{
 }
 button,input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 :focus-visible{outline:3px solid var(--ambar);outline-offset:2px}
+input:-webkit-autofill,input:-webkit-autofill:focus{
+  -webkit-text-fill-color:var(--texto);
+  box-shadow:0 0 0 1000px var(--campo) inset;
+  caret-color:var(--texto);
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 /* ---------- topo ---------- */
@@ -58,6 +63,7 @@ button,input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 .topo .t{font-size:13px;color:#aeb7c2;flex:1;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .topo .abas{display:flex;gap:4px}
+.topo .abas[hidden]{display:none}
 .topo .abas button{
   background:transparent;border:1px solid #333c47;color:#cfd6de;
   padding:6px 12px;border-radius:8px;cursor:pointer;font-size:14px;
@@ -124,7 +130,8 @@ body.escuro .prazo{background:#2a2213;border-color:#4b3d17;color:#f0e2c2}
 .campo > label{font-size:14px;font-weight:550;color:var(--texto)}
 .campo .ajuda{font-size:13px;color:var(--fraco);margin:0}
 .campo input[type=text],.campo input[type=tel],.campo input[type=email],
-.campo input[type=date],.campo input[type=number],.campo select,.campo textarea{
+.campo input[type=password],.campo input[type=date],.campo input[type=number],
+.campo select,.campo textarea{
   width:100%;padding:11px 12px;background:var(--campo);
   border:1px solid var(--campo-linha);border-radius:9px;
 }
