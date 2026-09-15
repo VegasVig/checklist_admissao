@@ -4,10 +4,8 @@ Substitui o check list em Word. O RH preenche o que era vermelho, manda um link,
 o candidato termina de preencher no celular, e tudo cai numa planilha do Google.
 Do painel você acompanha, anota e exporta o PDF da ficha.
 
-Este módulo é **separado** do sistema de levantamento de segurança: outra planilha,
-outro Apps Script, outra chave. É de propósito. Aqui trafegam CPF, conta bancária e
-nome de filho menor de idade; misturar com os planos de segurança dos clientes
-ampliaria quem tem acesso a esses dados sem necessidade.
+É um sistema fechado em si: site próprio, planilha própria, Apps Script próprio,
+chave própria. Não precisa de nada de fora para funcionar.
 
 ---
 
@@ -19,6 +17,7 @@ ampliaria quem tem acesso a esses dados sem necessidade.
 | `ficha.html` | A tela que o candidato recebe pelo link. |
 | `Admissao.gs` | Backend no Apps Script. Cria a planilha e responde às duas telas. |
 | `js/config.js` | Endereço da planilha e dados fixos da empresa. **Você edita este.** |
+| `js/chave.js` | A chave do painel. **Você edita este.** Só o painel carrega. |
 | `js/campos.js` | As perguntas da ficha. **Você edita este** para incluir ou tirar itens. |
 | `js/ficha.js` | Montagem, validação e envio da ficha do candidato. |
 | `js/rh.js` | Painel do RH. |
@@ -67,17 +66,43 @@ window.ADM_CONFIG = {
 O bloco `empresa` só preenche o formulário do RH automaticamente. Nada ali é secreto:
 esses três dados já saem impressos na ficha do candidato.
 
-Suba a pasta `admissao` para o mesmo repositório do GitHub onde está o sistema de
-levantamento. O painel fica em `seu-site/admissao/`.
+Crie um repositório novo no GitHub e suba o conteúdo desta pasta na raiz dele.
+Em **Settings → Pages**, escolha a branch `main`. O painel do RH é o endereço do
+site; a ficha do candidato é a mesma pasta com `/ficha.html?id=...`, e o próprio
+painel monta esse link.
 
-### 3. Entrar no painel
+Use um repositório separado do resto. Assim o endereço da ficha é curto, o que
+importa quando ele vai por WhatsApp, e você pode mexer numa coisa sem republicar
+a outra.
 
-Abra `seu-site/admissao/`, digite a chave do RH e entre. A chave fica guardada
-naquele aparelho e não é pedida de novo.
+### 3. A chave do painel
 
-**A chave do RH não vai no `config.js`.** Se fosse, qualquer candidato que abrisse o
-código-fonte da própria ficha conseguiria listar os dados de todos os outros. Cada
-pessoa do RH digita a chave uma vez, no aparelho dela.
+Abra `js/chave.js` e cole a chave que o `instalar()` mostrou:
+
+```js
+window.ADM_CHAVE = 'A3F91C77B2E04D58C1A9';
+```
+
+Pronto. O painel abre direto, em qualquer aparelho, sem pedir nada a ninguém.
+
+**Por que a chave fica num arquivo separado do `config.js`.** O `config.js` é
+carregado pelas duas telas, a do painel e a do candidato. O `chave.js` é carregado
+só pelo painel. Se a chave estivesse no `config.js`, ela iria junto na ficha do
+candidato, e qualquer um deles que abrisse o código-fonte da própria ficha leria
+CPF, conta bancária e nome de filho de todos os outros candidatos. Então: URL no
+`config.js`, chave no `chave.js`. Não junte os dois.
+
+**O que isso não resolve.** Num site do GitHub Pages todo arquivo é público. Quem
+souber o endereço do `chave.js` consegue baixá-lo. O que a separação garante é que o
+candidato não recebe a chave sem querer, junto com a ficha dele. Manter o painel num
+repositório separado da ficha ajuda mais, porque aí o candidato nunca vê nem o
+endereço do painel.
+
+Com a chave, o que alguém consegue é ler e mexer nas fichas. Não entra na sua conta
+Google nem em nada fora desta planilha.
+
+**Prefere não colar a chave?** Deixe `window.ADM_CHAVE = ''`. O painel volta a pedir
+a chave uma vez por aparelho, e ela fica guardada só ali.
 
 ---
 
@@ -150,8 +175,7 @@ Esta ficha guarda dado sensível de pessoa física. Vale tratar com cuidado.
 link vê aquela ficha, e só aquela. Mande pelo WhatsApp do candidato, não em grupo.
 
 **O painel é protegido pela chave.** Trocou alguém do RH? Rode `gerarNovaChave` no
-Apps Script. Quem usava o painel entra de novo com a chave nova, e quem saiu perde o
-acesso na hora.
+Apps Script, cole a nova em `js/chave.js` e publique. A chave velha morre na hora.
 
 **A planilha é o cofre.** Compartilhe com o mínimo de pessoas. Ela tem CPF, conta
 bancária e nome de filho menor.
@@ -170,7 +194,8 @@ link. Use quando a vaga cair.
 
 | Sintoma | O que é |
 |---|---|
-| *Chave do RH inválida* | Rode `verChave` no Apps Script e confira. Depois de `gerarNovaChave`, todo mundo entra de novo. |
+| *Chave do RH inválida* | Rode `verChave` no Apps Script e compare com o que está em `js/chave.js`. Depois de `gerarNovaChave`, atualize o arquivo e publique. |
+| *Falta o endereço da planilha* | A chave está preenchida mas a URL não. Cole a URL `/exec` em `js/config.js`. |
 | *Ficha não encontrada* no link do candidato | A ficha foi apagada no painel, ou o link veio cortado pelo WhatsApp. Gere de novo. |
 | *O servidor respondeu em formato inesperado* | A publicação não está como "Qualquer pessoa". Refaça o passo 6. |
 | O painel some depois de editar o `Admissao.gs` | Você criou implantação nova. Volte para a implantação antiga ou atualize a URL no `config.js`. |
@@ -186,4 +211,5 @@ link. Use quando a vaga cair.
    Você vê o que o candidato vê e descobre o que falta perguntar.
 2. Leia as quatro declarações com o jurídico. Elas são o que sustenta a ficha se a
    admissão der problema depois.
-3. Decida quem do RH tem a chave. Cada pessoa a mais é uma cópia a mais dos dados.
+3. Guarde o endereço do painel entre quem precisa dele. Com a chave no `chave.js`,
+   quem tem o endereço tem o acesso.

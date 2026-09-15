@@ -10,8 +10,10 @@ window.API = {
     return (window.ADM_CONFIG && window.ADM_CONFIG.url) || localStorage.getItem('adm_url') || '';
   },
 
-  /* a chave do RH nunca vem do código: só do aparelho de quem usa o painel */
-  chaveRh: function () { return localStorage.getItem('adm_chave') || ''; },
+  /* A chave vem do js/chave.js, que só o painel carrega. Se
+     estiver em branco, cai no que foi digitado no aparelho. */
+  chaveFixa: function () { return (window.ADM_CHAVE || '').trim(); },
+  chaveRh: function () { return this.chaveFixa() || localStorage.getItem('adm_chave') || ''; },
   guardarChave: function (k) { localStorage.setItem('adm_chave', k.trim()); },
   guardarUrl: function (u) { localStorage.setItem('adm_url', u.trim()); },
 

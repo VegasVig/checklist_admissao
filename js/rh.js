@@ -34,6 +34,26 @@ function render() {
    ============================================================ */
 function telaAcesso() {
   var temUrl = !!(window.ADM_CONFIG && window.ADM_CONFIG.url);
+
+  /* chave no arquivo mas sem endereço: o que falta é o config.js */
+  if (window.API.chaveFixa() && !window.API.url()) {
+    $('tela').innerHTML =
+      '<div style="max-width:560px;margin:40px auto">' +
+      '<h1 style="font-size:26px;margin:0 0 6px;letter-spacing:-.02em">Falta o endereço da planilha</h1>' +
+      '<p style="color:var(--fraco)">A chave já está em <b>js/chave.js</b>. Agora cole em <b>js/config.js</b> ' +
+      'a URL do aplicativo da web, aquela que termina em <b>/exec</b>, e publique.</p>' +
+      '<div class="campo cheia" style="margin-top:18px"><label for="inUrl">Ou use este endereço só neste aparelho</label>' +
+      '<input type="text" id="inUrl" value="' + esc(localStorage.getItem('adm_url') || '') + '"></div>' +
+      '<div class="btn-linha" style="margin-top:14px"><button class="btn" id="btnSoUrl">Usar este endereço</button></div>' +
+      '<div id="acessoMsg"></div></div>';
+    $('btnSoUrl').addEventListener('click', function () {
+      var u = $('inUrl').value.trim();
+      if (!u) return ($('acessoMsg').innerHTML = '<div class="aviso erro">Cole a URL terminada em /exec.</div>');
+      window.API.guardarUrl(u);
+      render();
+    });
+    return;
+  }
   $('tela').innerHTML =
     '<div style="max-width:520px;margin:40px auto">' +
     '<h1 style="font-size:26px;margin:0 0 6px;letter-spacing:-.02em">Entrar no painel</h1>' +
@@ -198,8 +218,13 @@ function telaFichas() {
     desenharFichas();
   }).catch(function (e) {
     $('tela').innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>' +
-      '<div class="btn-linha"><button class="btn sec" id="btnSair">Trocar a chave</button></div>';
-    $('btnSair').addEventListener('click', sair);
+      (window.API.chaveFixa()
+        ? '<p class="ajuda">A chave está escrita em <b>js/chave.js</b>. Rode <b>verChave</b> no Apps Script, ' +
+          'confira, corrija o arquivo e publique.</p>' +
+          '<div class="btn-linha"><button class="btn sec" id="btnRetentar">Tentar de novo</button></div>'
+        : '<div class="btn-linha"><button class="btn sec" id="btnSair">Trocar a chave</button></div>');
+    if ($('btnSair')) $('btnSair').addEventListener('click', sair);
+    if ($('btnRetentar')) $('btnRetentar').addEventListener('click', telaFichas);
   });
 }
 
@@ -215,7 +240,8 @@ function desenharFichas() {
     '<div class="btn-linha" style="margin-left:auto">' +
     '<button class="btn sec mini" id="btnAtualizar">Atualizar</button>' +
     '<button class="btn sec mini" id="btnCsv">Exportar CSV</button>' +
-    '<button class="btn sec mini" id="btnSair">Sair</button></div></div>' +
+    (window.API.chaveFixa() ? '' : '<button class="btn sec mini" id="btnSair">Sair</button>') +
+    '</div></div>' +
 
     '<div class="kpis">' +
     kpi(t, t === 1 ? 'ficha aberta' : 'fichas abertas', '') +
@@ -229,7 +255,7 @@ function desenharFichas() {
     $('tela').innerHTML = html;
     $('btnAtualizar').addEventListener('click', telaFichas);
     $('btnCsv').addEventListener('click', csv);
-    $('btnSair').addEventListener('click', sair);
+    if ($('btnSair')) $('btnSair').addEventListener('click', sair);
     return;
   }
 
@@ -256,7 +282,7 @@ function desenharFichas() {
 
   $('btnAtualizar').addEventListener('click', telaFichas);
   $('btnCsv').addEventListener('click', csv);
-  $('btnSair').addEventListener('click', sair);
+  if ($('btnSair')) $('btnSair').addEventListener('click', sair);
   $('fStatus').addEventListener('change', function () { FILTRO.status = this.value; desenharFichas(); });
   $('fBusca').addEventListener('input', function () {
     FILTRO.busca = this.value;
