@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0f1216">
+<title>Admissões — Vegas</title>
+<link rel="stylesheet" href="css/admissao.css">
+</head>
+<body class="escuro">
+
+<header class="topo">
+  <img id="logoTopo" alt="Vegas Vigilância e Segurança">
+  <span class="t">Admissões</span>
+  <nav class="abas" id="abas" hidden>
+    <button data-aba="nova" class="on">Nova ficha</button>
+    <button data-aba="fichas">Fichas</button>
+  </nav>
+</header>
+
+<main class="env largo" id="tela"></main>
+
+<dialog id="janela">
+  <div class="cab">
+    <h2 id="janTitulo">Ficha</h2>
+    <button class="btn sec mini" id="janFechar">Fechar</button>
+  </div>
+  <div class="conteudo" id="janCorpo"></div>
+  <div class="pe" id="janPe"></div>
+</dialog>
+
+<script src="js/config.js"></script>
+<script src="js/logo.js"></script>
+<script src="js/campos.js"></script>
+<script src="js/api.js"></script>
+<script src="js/documento.js"></script>
+<script src="js/rh.js"></script>
+</body>
+</html>
