@@ -19,8 +19,8 @@ window.CAMPOS_RH = [
   { id: 'horario',   rot: 'Horário de trabalho',     tipo: 'texto',  obrig: true,  dica: '12x36 diurno, 7h às 19h' },
   { id: 'admissao',  rot: 'Data de admissão prevista', tipo: 'data', obrig: true,
     ajuda: 'Pode ter alteração. O candidato vê esse aviso.' },
-  { id: 'telRh',     rot: 'Telefone do RH para envio dos documentos', tipo: 'tel', obrig: true, larg: 'cheia',
-    ajuda: 'É o número que aparece nas orientações da ficha.' }
+  { id: 'telRh',     rot: 'Telefone do RH para contato', tipo: 'tel', obrig: true, larg: 'cheia',
+    ajuda: 'Aparece na ficha, para o candidato tirar dúvidas. Os documentos ele manda pelo próprio formulário.' }
 ];
 
 /* ---------- seções do candidato ----------
@@ -31,24 +31,40 @@ window.SECOES_CANDIDATO = [
   {
     id: 'documentos',
     nome: 'Documentos pessoais',
-    texto: 'Marque o que você já separou. O envio é pelo WhatsApp do RH, em PDF.',
+    texto: 'Fotografe cada documento com o próprio celular. Apoie numa superfície clara, ' +
+           'sem sombra em cima, e confira se dá para ler antes de enviar.',
     campos: [
-      { id: 'doc_ctps',     rot: 'Carteira de Trabalho Digital', tipo: 'check', obrig: true },
-      { id: 'doc_cpf',      rot: 'CPF',                          tipo: 'check', obrig: true },
-      { id: 'doc_rg',       rot: 'RG',                           tipo: 'check', obrig: true },
+      { id: 'doc_ctps',     rot: 'Carteira de Trabalho Digital', tipo: 'foto', obrig: true,
+        ajuda: 'No aplicativo CTPS Digital, toque em Contratos e depois em compartilhar. Serve a foto da tela ou o PDF.' },
+      { id: 'doc_cpf',      rot: 'CPF',                          tipo: 'foto', obrig: true,
+        ajuda: 'Se o número já estiver no seu RG ou na CNH, pode mandar o mesmo documento aqui.' },
+      { id: 'doc_rg',       rot: 'RG',                           tipo: 'foto', obrig: true,
+        partes: ['Frente', 'Verso'] },
+
       { id: 'tem_cnh',      rot: 'Você tem CNH válida?',         tipo: 'simnao', obrig: true },
-      { id: 'doc_cnh',      rot: 'CNH',                          tipo: 'check', se: 'tem_cnh=Sim' },
-      { id: 'doc_residencia', rot: 'Comprovante de residência',  tipo: 'check', obrig: true },
-      { id: 'doc_titulo',   rot: 'Título de eleitor',            tipo: 'check', obrig: true },
-      { id: 'doc_reservista', rot: 'Certificado de reservista',  tipo: 'check',
-        nota: 'só homens até 45 anos' },
-      { id: 'doc_ata',      rot: 'ATA — curso de formação de vigilante', tipo: 'check',
+      { id: 'doc_cnh',      rot: 'CNH',                          tipo: 'foto', se: 'tem_cnh=Sim', obrig: true,
+        partes: ['Frente', 'Verso'],
+        ajuda: 'Se usa a CNH digital, o PDF do aplicativo Carteira Digital de Trânsito também serve.' },
+
+      { id: 'doc_residencia', rot: 'Comprovante de residência',  tipo: 'foto', obrig: true,
+        ajuda: 'Conta de luz, água ou telefone dos últimos três meses. Pode estar no nome de outra pessoa da casa.' },
+      { id: 'doc_titulo',   rot: 'Título de eleitor',            tipo: 'foto', obrig: true },
+      { id: 'doc_reservista', rot: 'Certificado de reservista',  tipo: 'foto',
+        nota: 'só homens até 45 anos', partes: ['Frente', 'Verso'] },
+
+      { id: 'doc_ata',      rot: 'ATA — curso de formação de vigilante', tipo: 'foto',
         nota: 'obrigatório para vigilante' },
-      { id: 'doc_cnv',      rot: 'CNV — Carteira Nacional de Vigilante', tipo: 'check',
-        nota: 'se você já tem' },
-      { id: 'doc_escolaridade', rot: 'Comprovante de escolaridade', tipo: 'check', obrig: true },
-      { id: 'doc_foto',     rot: 'Foto 3x4',                     tipo: 'check', obrig: true },
-      { id: 'doc_certidao', rot: 'Certidão de nascimento ou casamento', tipo: 'check', obrig: true }
+      { id: 'doc_cnv',      rot: 'CNV — Carteira Nacional de Vigilante', tipo: 'foto',
+        nota: 'se você já tem', partes: ['Frente', 'Verso'] },
+
+      { id: 'doc_escolaridade', rot: 'Comprovante de escolaridade', tipo: 'foto', obrig: true,
+        ajuda: 'Histórico, diploma ou declaração da escola.' },
+      { id: 'doc_certidao', rot: 'Certidão de nascimento ou casamento', tipo: 'foto', obrig: true },
+
+      { id: 'doc_selfie',   rot: 'Selfie com fundo branco',      tipo: 'foto', obrig: true,
+        camera: 'user',
+        ajuda: 'Fica no lugar da antiga foto 3x4. De frente para uma parede branca, rosto inteiro, ' +
+               'sem boné, sem óculos escuros e sem ninguém atrás. Luz de frente, não de costas.' }
     ]
   },
 
@@ -64,12 +80,17 @@ window.SECOES_CANDIDATO = [
       { id: 'tem_filhos',   rot: 'Tem filhos menores de 14 anos?', tipo: 'simnao', obrig: true },
       { id: 'filhos',       rot: 'Filhos',                       tipo: 'filhos', se: 'tem_filhos=Sim', obrig: true },
 
-      { id: 'dep_certidao', rot: 'Certidão de nascimento dos filhos', tipo: 'check', se: 'tem_filhos=Sim' },
-      { id: 'dep_cpf',      rot: 'CPF dos filhos',               tipo: 'check', se: 'tem_filhos=Sim' },
-      { id: 'dep_escola',   rot: 'Comprovante de frequência escolar', tipo: 'check', se: 'tem_filhos=Sim',
-        ajuda: 'Filhos de 7 a 14 anos.' },
-      { id: 'dep_vacina',   rot: 'Caderneta de vacinação',       tipo: 'check', se: 'tem_filhos=Sim',
-        ajuda: 'Filhos de até 7 anos.' }
+      { id: 'dep_certidao', rot: 'Certidão de nascimento dos filhos', tipo: 'foto', se: 'tem_filhos=Sim', obrig: true,
+        varios: true, ajuda: 'Uma foto por filho. Toque em adicionar para mandar a próxima.' },
+      { id: 'dep_cpf',      rot: 'CPF dos filhos',               tipo: 'foto', se: 'tem_filhos=Sim',
+        varios: true, nota: 'se já tiverem CPF emitido' },
+      { id: 'dep_escola',   rot: 'Comprovante de frequência escolar', tipo: 'foto', se: 'tem_filhos=Sim',
+        varios: true, nota: 'filhos de 7 a 14 anos',
+        ajuda: 'A declaração que a escola emite. Uma por filho nessa idade.' },
+      { id: 'dep_vacina',   rot: 'Caderneta de vacinação',       tipo: 'foto', se: 'tem_filhos=Sim',
+        nota: 'filhos de até 7 anos',
+        partes: ['Página de identificação', 'Página das vacinas'],
+        ajuda: 'São duas fotos: a página com o nome da criança e a página onde ficam as doses carimbadas.' }
     ]
   },
 
@@ -82,8 +103,9 @@ window.SECOES_CANDIDATO = [
         ajuda: 'Conte ida e volta. Dois ônibus na ida e dois na volta são 4.' },
       { id: 'vt_valor',     rot: 'Valor gasto por dia',          tipo: 'moeda', se: 'vt=Sim', obrig: true, dica: 'R$ 0,00' },
       { id: 'vt_linhas',    rot: 'Quais linhas você pega',       tipo: 'texto', se: 'vt=Sim', larg: 'cheia' },
-      { id: 'vt_cartao',    rot: 'Você já tem cartão de passagem?', tipo: 'simnao', se: 'vt=Sim', obrig: true,
-        ajuda: 'Se tiver, mande a foto do cartão junto com os documentos.' }
+      { id: 'vt_cartao',    rot: 'Você já tem cartão de passagem?', tipo: 'simnao', se: 'vt=Sim', obrig: true },
+      { id: 'vt_cartao_foto', rot: 'Foto do cartão de passagem', tipo: 'foto', se: 'vt_cartao=Sim', obrig: true,
+        ajuda: 'O lado onde aparece o número.' }
     ]
   },
 
@@ -120,23 +142,23 @@ window.SECOES_CANDIDATO = [
     nome: 'Pensão alimentícia',
     campos: [
       { id: 'pensao',     rot: 'Você paga pensão descontada em folha?', tipo: 'simnao', obrig: true },
-      { id: 'pensao_doc', rot: 'Já separei a decisão judicial ou o acordo', tipo: 'check', se: 'pensao=Sim', obrig: true,
-        ajuda: 'Sem o documento, o desconto não pode ser feito.' }
+      { id: 'pensao_doc', rot: 'Decisão judicial ou acordo', tipo: 'foto', se: 'pensao=Sim', obrig: true,
+        varios: true, ajuda: 'Sem o documento, o desconto não pode ser feito. Pode mandar mais de uma página.' }
     ]
   },
 
   {
     id: 'certidoes',
     nome: 'Certidões negativas',
-    texto: 'Três certidões, todas gratuitas e emitidas na hora. Toque no link, baixe o PDF e mande junto com o resto.',
+    texto: 'Três certidões, todas gratuitas e emitidas na hora. Toque no link, baixe o PDF e envie aqui mesmo.',
     campos: [
-      { id: 'cert_eleitoral', rot: 'Justiça Eleitoral', tipo: 'check', obrig: true,
+      { id: 'cert_eleitoral', rot: 'Justiça Eleitoral', tipo: 'foto', obrig: true,
         link: 'https://www.tse.jus.br/servicos-eleitorais/certidoes/certidao-de-quitacao-eleitoral',
         linkRot: 'Emitir no site do TSE' },
-      { id: 'cert_federal',   rot: 'Justiça Federal',   tipo: 'check', obrig: true,
+      { id: 'cert_federal',   rot: 'Justiça Federal',   tipo: 'foto', obrig: true,
         link: 'https://certidao-unificada.cjf.jus.br/#/solicitacao-certidao',
         linkRot: 'Emitir no site do CJF' },
-      { id: 'cert_estadual',  rot: 'Justiça Criminal Estadual', tipo: 'check', obrig: true,
+      { id: 'cert_estadual',  rot: 'Justiça Criminal Estadual', tipo: 'foto', obrig: true, varios: true,
         link: 'https://www3.tjrj.jus.br/CJE/certidao',
         linkRot: 'Emitir no site do TJRJ',
         ajuda: 'O link é do Rio de Janeiro. Se você morou em outro estado nos últimos 5 anos, emita também no tribunal de lá.' }
@@ -197,12 +219,58 @@ window.campoVisivel = function (campo, resp) {
   return (resp[p[0]] || '') === p[1];
 };
 
+/* quantas fotos aquele campo espera, e quais os rótulos delas */
+window.partesDe = function (campo) {
+  if (campo.partes && campo.partes.length) return campo.partes.slice();
+  return [''];
+};
+
+/* arquivos já enviados de um campo: sempre uma lista */
+window.arquivosDe = function (resp, id) {
+  var v = resp[id];
+  if (!v) return [];
+  return Array.isArray(v) ? v : [v];
+};
+
+/* o campo de foto está completo? */
+window.fotoCompleta = function (campo, resp) {
+  var arqs = window.arquivosDe(resp, campo.id);
+  if (!arqs.length) return false;
+  if (campo.partes && campo.partes.length) {
+    return campo.partes.every(function (p) {
+      return arqs.some(function (a) { return a.parte === p; });
+    });
+  }
+  return true;
+};
+
+/* o que falta da foto, dito em uma linha */
+window.faltaNaFoto = function (campo, resp) {
+  var arqs = window.arquivosDe(resp, campo.id);
+  if (campo.partes && campo.partes.length) {
+    var faltando = campo.partes.filter(function (p) {
+      return !arqs.some(function (a) { return a.parte === p; });
+    });
+    if (!faltando.length) return '';
+    if (faltando.length === campo.partes.length) return campo.rot;
+    return campo.rot + ' (' + faltando.join(' e ') + ')';
+  }
+  return arqs.length ? '' : campo.rot;
+};
+
 /* lista do que ainda falta, em linguagem de quem preenche */
 window.pendencias = function (resp) {
   var faltas = [];
   window.SECOES_CANDIDATO.forEach(function (s) {
     s.campos.forEach(function (c) {
       if (!c.obrig || !window.campoVisivel(c, resp)) return;
+
+      if (c.tipo === 'foto') {
+        var falta = window.faltaNaFoto(c, resp);
+        if (falta) faltas.push({ secao: s.id, secaoNome: s.nome, id: c.id, rot: falta });
+        return;
+      }
+
       var v = resp[c.id];
       var vazio = (c.tipo === 'check') ? v !== true
                 : (c.tipo === 'filhos') ? !(v && v.length && v.every(function (f) { return f.nome; }))

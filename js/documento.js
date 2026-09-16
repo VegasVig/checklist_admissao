@@ -14,6 +14,36 @@
 
   function cx(marcado) { return marcado ? '☑' : '☐'; }
 
+  function arqs(d, id) {
+    var v = d[id];
+    if (!v) return [];
+    return Array.isArray(v) ? v : [v];
+  }
+
+  function recebido(c, d) {
+    var l = arqs(d, c.id);
+    if (!l.length) return false;
+    if (c.partes && c.partes.length) {
+      return c.partes.every(function (pt) {
+        return l.some(function (a) { return a.parte === pt; });
+      });
+    }
+    return true;
+  }
+
+  function detalheArquivo(c, d) {
+    var l = arqs(d, c.id);
+    if (!l.length) return 'não enviado';
+    if (c.partes && c.partes.length) {
+      var faltam = c.partes.filter(function (pt) {
+        return !l.some(function (a) { return a.parte === pt; });
+      });
+      if (faltam.length) return 'falta ' + faltam.join(' e ').toLowerCase();
+      return c.partes.length + ' arquivos';
+    }
+    return l.length > 1 ? l.length + ' arquivos' : '1 arquivo';
+  }
+
   function valorTexto(c, dados) {
     var v = dados[c.id];
     if (c.tipo === 'check') return cx(v === true);
@@ -45,9 +75,13 @@
     var corpo = '';
 
     /* cabeçalho */
+    var selfie = arqs(d, 'doc_selfie')[0];
+
     corpo += '<div class="capa">' +
       '<img class="logo" src="' + logo + '" alt="Vegas">' +
       '<h1>Check list de admissão</h1>' +
+      (selfie && selfie.previa
+        ? '<img class="retrato" src="' + selfie.previa + '" alt="">' : '') +
       '<table class="cab"><tbody>' +
       lin('Empresa', rh.razao) +
       lin('CNPJ', rh.cnpj) +
@@ -61,11 +95,10 @@
 
     /* orientações, como no documento original */
     corpo += '<div class="bloco"><h2>Orientações gerais</h2>' +
-      '<p>Após o recebimento deste checklist, todos os documentos devem ser enviados até às 10h do próximo dia. ' +
-      'O envio é feito pelo WhatsApp, para o contato ' + esc(window.formatarTel(rh.telRh)) + ', em formato PDF, ' +
-      'com os arquivos digitalizados e nomeados com nome completo, nome do documento e nome do setor. ' +
-      'Recebidos os arquivos, o RH analisa a documentação. Em situações urgentes, os documentos devem ser ' +
-      'enviados por mensagem temporária, para que não fiquem salvos em servidores ou arquivos da empresa.</p></div>';
+      '<p>Os documentos são enviados pelo próprio formulário eletrônico, em foto ou PDF, e ficam ' +
+      'guardados na pasta do candidato no Drive da empresa. Recebidos os arquivos, o RH analisa a ' +
+      'documentação. Dúvidas e pendências pelo contato ' + esc(window.formatarTel(rh.telRh)) + '. ' +
+      'Este documento lista o que foi recebido; as imagens ficam no Drive, não aqui.</p></div>';
 
     if (vazia) {
       corpo += '<div class="bloco aviso">Ficha ainda não preenchida pelo candidato. ' +
@@ -81,13 +114,22 @@
       corpo += '<div class="bloco"><h2>' + esc(s.nome) + '</h2>';
 
       var checks = visiveis.filter(function (c) { return c.tipo === 'check'; });
-      var outros = visiveis.filter(function (c) { return c.tipo !== 'check'; });
+      var docs   = visiveis.filter(function (c) { return c.tipo === 'foto'; });
+      var outros = visiveis.filter(function (c) { return c.tipo !== 'check' && c.tipo !== 'foto'; });
 
       if (checks.length) {
         corpo += '<ul class="checks">' + checks.map(function (c) {
           return '<li>' + cx(d[c.id] === true) + ' ' + esc(c.rot) +
             (c.nota ? ' <span class="nota">(' + esc(c.nota) + ')</span>' : '') + '</li>';
         }).join('') + '</ul>';
+      }
+
+      if (docs.length) {
+        corpo += '<table class="dados docs"><tbody>' + docs.map(function (c) {
+          return '<tr><th>' + cx(recebido(c, d)) + ' ' + esc(c.rot) +
+            (c.nota ? ' <span class="nota">(' + esc(c.nota) + ')</span>' : '') + '</th>' +
+            '<td class="leve">' + esc(detalheArquivo(c, d)) + '</td></tr>';
+        }).join('') + '</tbody></table>';
       }
       if (outros.length) {
         corpo += '<table class="dados"><tbody>' + outros.map(function (c) {
@@ -182,6 +224,11 @@
     '.dados th,.dados td{text-align:left;padding:6px 8px;border-bottom:1px solid #dfe4e9;vertical-align:top;font-size:10.5pt}',
     '.dados th{width:52%;font-weight:500;color:#3d4650}',
     '.dados td{font-weight:600}',
+    '.dados.docs th{width:70%;font-weight:500}',
+    '.dados td.leve{font-weight:400;color:#5b6570;font-size:9.5pt}',
+    '.capa{position:relative}',
+    '.retrato{position:absolute;top:0;right:0;width:82px;height:104px;object-fit:cover;',
+    '  border:1px solid #c9d0d7;border-radius:3px;background:#fff}',
     'ul.checks{list-style:none;margin:0 0 10px;padding:0;columns:2;column-gap:26px}',
     'ul.checks li{margin:0 0 5px;font-size:10.5pt;break-inside:avoid}',
     '.nota{color:#6b7580;font-size:9pt}',

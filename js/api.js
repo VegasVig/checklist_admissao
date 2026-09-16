@@ -70,6 +70,24 @@ window.API = {
       });
   },
 
+  /* o candidato manda cada arquivo na hora em que escolhe, um por
+     requisição. Assim a barra de progresso é por documento e um
+     erro de rede só derruba aquela foto, não a ficha inteira. */
+  enviarArquivo: function (idFicha, campo, rot, parte, arquivo) {
+    return this.chamar('arquivo', {
+      id: idFicha, campo: campo, rot: rot, parte: parte,
+      mime: arquivo.mime, dados: arquivo.dados
+    }, false).then(function (r) { return r.arquivo; });
+  },
+
+  tirarArquivo: function (idFicha, driveId) {
+    return this.chamar('tirarArquivo', { id: idFicha, driveId: driveId }, false);
+  },
+
+  baixarArquivo: function (driveId) {
+    return this.chamar('baixar', { driveId: driveId }, true);
+  },
+
   ping:      function ()          { return this.chamar('ping', {}, true); },
   criar:     function (rh)        { return this.chamar('criar', { rh: rh }, true); },
   ler:       function (id)        { return this.chamar('ler', { id: id }, false); },

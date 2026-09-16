@@ -42,8 +42,29 @@ function render() {
 /* ============================================================
    acesso
    ============================================================ */
+/* diz, em português, por que o endereço não chegou */
+function diagnosticoUrl() {
+  if (typeof window.ADM_CONFIG === 'undefined') {
+    return 'O arquivo <b>js/config.js</b> não carregou. Ou ele não subiu para o site, ' +
+           'ou tem um erro de digitação que impede o navegador de ler: falta de aspas, ' +
+           'de vírgula ou de chave. Abra <b>' + esc(caminhoConfig()) + '</b> no navegador ' +
+           'para ver o que o site está entregando.';
+  }
+  if (!(window.ADM_CONFIG.url || '').trim()) {
+    return 'O <b>js/config.js</b> carregou, mas a linha <b>url</b> está vazia. ' +
+           'Confira em <b>' + esc(caminhoConfig()) + '</b>: é lá que o navegador está lendo. ' +
+           'Se a URL aparecer nessa página e mesmo assim der este aviso, é cache — ' +
+           'recarregue com Ctrl+Shift+R.';
+  }
+  return '';
+}
+
+function caminhoConfig() {
+  return location.href.replace(/\/[^\/]*(\?.*)?$/, '/') + 'js/config.js';
+}
+
 function telaAcesso() {
-  var temUrl = !!(window.ADM_CONFIG && window.ADM_CONFIG.url);
+  var temUrl = !!(window.ADM_CONFIG && (window.ADM_CONFIG.url || '').trim());
 
   /* chave no arquivo mas sem endereço: o que falta é o config.js */
   if (window.API.chaveFixa() && !window.API.url()) {
@@ -71,8 +92,10 @@ function telaAcesso() {
     'Só quem trabalha com as fichas entra aqui.</p>' +
 
     (temUrl ? '' :
+      '<div class="aviso info" style="margin-bottom:18px">' + diagnosticoUrl() + '</div>' +
       '<div class="campo cheia" style="margin-bottom:16px"><label for="inUrl">Endereço do aplicativo da web</label>' +
-      '<p class="ajuda">Termina em /exec. Some daqui quando você preencher o js/config.js.</p>' +
+      '<p class="ajuda">Termina em /exec. Colando aqui, vale só neste computador. ' +
+      'Some deste formulário quando o js/config.js estiver certo.</p>' +
       '<input type="text" id="inUrl" value="' + esc(localStorage.getItem('adm_url') || '') + '"></div>') +
 
     '<div class="campo cheia" style="margin-bottom:14px"><label for="inUsuario">Usuário</label>' +
@@ -85,7 +108,25 @@ function telaAcesso() {
     '<div id="acessoMsg"></div></div>';
 
   function entrar() {
-    var u = $('inUrl'); if (u) window.API.guardarUrl(u.value);
+    var u = $('inUrl');
+    if (u) {
+      var endereco = u.value.trim();
+      if (!endereco) {
+        $('acessoMsg').innerHTML = '<div class="aviso erro">Cole o endereço terminado em /exec.</div>';
+        u.focus();
+        return;
+      }
+      /* aceita também o formato das contas Google Workspace,
+         que traz /a/macros/dominio/ no meio do caminho */
+      if (/^https?:\/\//.test(endereco) && !/\/exec$/.test(endereco)) {
+        $('acessoMsg').innerHTML = '<div class="aviso erro">Esse endereço não termina em ' +
+          '<b>/exec</b>. Cuidado para não copiar o link do editor do Apps Script, que acaba ' +
+          'em /edit. O certo vem de Implantar, na tela que mostra o aplicativo da web.</div>';
+        u.focus();
+        return;
+      }
+      window.API.guardarUrl(endereco);
+    }
     var usuario = $('inUsuario').value.trim();
     var senha = $('inSenha').value;
 
@@ -420,6 +461,11 @@ function abrirFicha(id) {
     };
     var obs = $('obsSalvar');
     if (obs) obs.addEventListener('click', function () { salvarAnotacao(id, null); });
+
+    $('janCorpo').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-ver]');
+      if (b) verArquivo(b.dataset.ver, b.dataset.nome, !!b.dataset.pdf);
+    });
   }).catch(function (e) {
     $('janCorpo').innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
   });
@@ -441,6 +487,8 @@ function detalheHtml(f) {
     window.SECOES_CANDIDATO.forEach(function (s) {
       var campos = s.campos.filter(function (c) { return window.campoVisivel(c, d); });
       if (!campos.length) return;
+      var fotos = campos.filter(function (c) { return c.tipo === 'foto'; });
+
       h += '<div class="resp"><h3>' + esc(s.nome) + '</h3>' +
         campos.map(function (c) {
           if (c.tipo === 'assinatura') {
@@ -449,13 +497,16 @@ function detalheHtml(f) {
                 '<img src="' + d.assinatura + '" alt="" style="height:52px;background:#fff;border-radius:6px;padding:3px"></span></div>'
               : li('Assinatura', 'não assinada');
           }
+          if (c.tipo === 'foto') return '';
           var v = d[c.id];
           if (c.tipo === 'check') v = v === true ? 'sim' : 'não';
           else if (c.tipo === 'data') v = window.dataBr(v);
           else if (c.tipo === 'filhos') v = (v || []).filter(function (x) { return x.nome; })
             .map(function (x) { return x.nome + (x.idade ? ' (' + x.idade + ')' : ''); }).join('; ');
           return li(c.rot, v || '—');
-        }).join('') + '</div>';
+        }).join('') +
+        (fotos.length ? grade(fotos, d) : '') +
+        '</div>';
     });
   }
 
@@ -469,6 +520,66 @@ function detalheHtml(f) {
 
 function li(k, v) {
   return '<div class="li"><span class="k">' + esc(k) + '</span><span class="v">' + esc(v) + '</span></div>';
+}
+
+/* documentos enviados, em cartões clicáveis */
+function grade(campos, d) {
+  var cartoes = '';
+  campos.forEach(function (c) {
+    var arqs = window.arquivosDe(d, c.id);
+    if (!arqs.length) {
+      if (!c.obrig) return;
+      cartoes += '<div class="doc-cartao"><div class="vazio-mini">não enviado</div>' +
+        '<div class="rot"><b>' + esc(c.rot) + '</b></div></div>';
+      return;
+    }
+    arqs.forEach(function (a) {
+      var ehPdf = a.mime === 'application/pdf';
+      cartoes += '<button type="button" class="doc-cartao" data-ver="' + esc(a.driveId) + '" ' +
+        'data-nome="' + esc(c.rot + (a.parte ? ' — ' + a.parte : '')) + '" ' +
+        'data-pdf="' + (ehPdf ? '1' : '') + '">' +
+        (a.previa
+          ? '<img src="' + a.previa + '" alt="">'
+          : '<div class="vazio-mini">' + (ehPdf ? 'PDF' : 'abrir') + '</div>') +
+        '<div class="rot"><b>' + esc(c.rot) + '</b>' + esc(a.parte || '') + '</div>' +
+        '</button>';
+    });
+  });
+  return cartoes ? '<div class="doc-grade">' + cartoes + '</div>' : '';
+}
+
+/* abre o arquivo em tamanho grande, buscando do Drive na hora */
+function verArquivo(driveId, nome, ehPdf) {
+  /* uma <dialog> por cima da outra: assim o Esc fecha só a de cima,
+     e não leva junto a ficha que está aberta atrás */
+  var caixa = document.createElement('dialog');
+  caixa.className = 'lupa';
+  caixa.innerHTML = '<button class="btn sec mini fechar-lupa">Fechar</button>' +
+    '<p style="color:#cfd6de">Carregando ' + esc(nome) + '…</p>';
+  document.body.appendChild(caixa);
+  caixa.showModal();
+
+  function sair() { caixa.close(); caixa.remove(); }
+  caixa.addEventListener('close', function () { caixa.remove(); });
+  caixa.addEventListener('click', function (e) {
+    if (e.target === caixa || e.target.classList.contains('fechar-lupa')) sair();
+  });
+
+  window.API.baixarArquivo(driveId).then(function (r) {
+    var url = 'data:' + r.mime + ';base64,' + r.dados;
+    if (ehPdf || r.mime === 'application/pdf') {
+      caixa.innerHTML = '<button class="btn sec mini fechar-lupa">Fechar</button>' +
+        '<iframe src="' + url + '" style="width:min(900px,92vw);height:86vh;border:0;border-radius:8px;background:#fff"></iframe>';
+    } else {
+      caixa.innerHTML = '<button class="btn sec mini fechar-lupa">Fechar</button>' +
+        '<img src="' + url + '" alt="' + esc(nome) + '">';
+    }
+    caixa.querySelector('.fechar-lupa').addEventListener('click', sair);
+  }).catch(function (e) {
+    caixa.innerHTML = '<button class="btn sec mini fechar-lupa">Fechar</button>' +
+      '<div class="aviso erro">' + esc(e.message) + '</div>';
+    caixa.querySelector('.fechar-lupa').addEventListener('click', sair);
+  });
 }
 
 function salvarAnotacao(id, novoStatus) {

@@ -30,13 +30,21 @@ var CFG = {
      Depois disso, mude pela função trocarSenha() — editar aqui
      não muda nada, porque a senha já foi gravada. */
   USUARIO_INICIAL: 'admin',
-  SENHA_INICIAL: 'Vegas4747@'
+  SENHA_INICIAL: 'Vegas4747@',
+
+  /* pasta do Drive onde ficam as fotos dos documentos */
+  PASTA_RAIZ: 'Vegas — Documentos de admissão',
+
+  /* tamanho máximo de cada arquivo já decodificado, em MB.
+     O celular manda foto de 4 MB; o aplicativo reduz antes de
+     subir, então na prática chega bem abaixo disso. */
+  MAX_MB: 10
 };
 
 var COLUNAS = [
   'id', 'criadaEm', 'status', 'razao', 'cnpj', 'posto', 'candidato', 'whatsapp',
   'funcao', 'salario', 'horario', 'admissao', 'telRh',
-  'enviadaEm', 'observacoes', 'dados', 'assinatura'
+  'enviadaEm', 'observacoes', 'dados', 'assinatura', 'pasta'
 ];
 
 var CAMPOS_RH = ['razao', 'cnpj', 'posto', 'candidato', 'whatsapp', 'funcao',
@@ -77,6 +85,7 @@ function instalar() {
     ' ADMISSÕES — INSTALAÇÃO CONCLUÍDA\n' +
     '============================================================\n' +
     ' PLANILHA    : ' + ss.getUrl() + '\n' +
+    ' FOTOS EM    : Drive, pasta "' + CFG.PASTA_RAIZ + '"\n' +
     ' USUÁRIO     : ' + CFG.USUARIO_INICIAL + '\n' +
     ' SENHA       : ' + (criouUsuario ? CFG.SENHA_INICIAL : '(já existia, não foi mexida)') + '\n' +
     ' CHAVE DO RH : ' + chave + '\n' +
@@ -98,6 +107,21 @@ function criarAbas_(ss) {
     fichas = ss.getSheets()[0];
     fichas.setName('Fichas');
   }
+
+  /* planilha que já existia: acrescenta as colunas que faltarem,
+     sem mexer no que já está gravado */
+  if (fichas.getLastRow() > 0) {
+    var largura = Math.max(fichas.getLastColumn(), 1);
+    var atuais = fichas.getRange(1, 1, 1, largura).getValues()[0];
+    for (var i = 0; i < COLUNAS.length; i++) {
+      if (atuais.indexOf(COLUNAS[i]) === -1) {
+        fichas.getRange(1, atuais.length + 1).setValue(COLUNAS[i])
+          .setFontWeight('bold').setBackground('#14181d').setFontColor('#ffffff');
+        atuais.push(COLUNAS[i]);
+      }
+    }
+  }
+
   if (fichas.getLastRow() === 0) {
     fichas.getRange(1, 1, 1, COLUNAS.length).setValues([COLUNAS]);
     fichas.getRange(1, 1, 1, COLUNAS.length).setFontWeight('bold').setBackground('#14181d').setFontColor('#ffffff');
@@ -178,7 +202,9 @@ function doPost(e) {
     /* ações abertas: o candidato não tem chave, tem o link */
     if (acao === 'ler')    return json_(lerFicha_(dados.id));
     if (acao === 'salvar') return json_(salvarFicha_(dados.id, dados.dados));
-    if (acao === 'login')  return json_(login_(dados.usuario, dados.senha));
+    if (acao === 'login')   return json_(login_(dados.usuario, dados.senha));
+    if (acao === 'arquivo') return json_(guardarArquivo_(dados));
+    if (acao === 'tirarArquivo') return json_(tirarArquivo_(dados.id, dados.driveId));
 
     /* daqui para baixo, só com a chave do RH */
     if (!conferirChave_(dados.chave)) return json_({ ok: false, erro: 'Chave do RH inválida.' });
@@ -189,6 +215,7 @@ function doPost(e) {
     if (acao === 'detalhe') return json_(detalheFicha_(dados.id));
     if (acao === 'anotar')  return json_(anotar_(dados.id, dados.observacoes, dados.status));
     if (acao === 'apagar')  return json_(apagarFicha_(dados.id));
+    if (acao === 'baixar')  return json_(baixarArquivo_(dados.driveId));
 
     return json_({ ok: false, erro: 'Ação desconhecida: ' + acao });
   } catch (err) {
@@ -363,6 +390,132 @@ function verUsuarios() {
 }
 
 /* ============================================================
+   ARQUIVOS NO DRIVE
+
+   Cada ficha ganha uma pasta própria dentro de uma pasta por mês.
+   As fotos nunca ficam públicas: quem precisa ver, vê pelo painel,
+   e o painel só devolve a imagem para quem entrou com usuário e
+   senha. Apagar a ficha manda a pasta para a lixeira do Drive.
+   ============================================================ */
+
+function pastaRaiz_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('PASTA_RAIZ_ID');
+  if (id) {
+    try {
+      var f = DriveApp.getFolderById(id);
+      if (!f.isTrashed()) return f;
+    } catch (e) {}
+  }
+  var nova = DriveApp.createFolder(CFG.PASTA_RAIZ);
+  props.setProperty('PASTA_RAIZ_ID', nova.getId());
+  return nova;
+}
+
+function subPasta_(pai, nome) {
+  var it = pai.getFoldersByName(nome);
+  return it.hasNext() ? it.next() : pai.createFolder(nome);
+}
+
+/* pasta da ficha, criada na primeira foto que chega */
+function pastaDaFicha_(sh, linha, o) {
+  var col = COLUNAS.indexOf('pasta') + 1;
+  var id = sh.getRange(linha, col).getValue();
+  if (id) {
+    try {
+      var f = DriveApp.getFolderById(id);
+      if (!f.isTrashed()) return f;
+    } catch (e) {}
+  }
+  var criada = o.criadaEm instanceof Date ? o.criadaEm : new Date();
+  var mes = Utilities.formatDate(criada, 'GMT-3', 'yyyy-MM');
+  var nome = limparNome_(o.candidato || 'sem nome') + ' - ' + String(o.id).substring(0, 8);
+  var pasta = subPasta_(subPasta_(pastaRaiz_(), mes), nome);
+  sh.getRange(linha, col).setValue(pasta.getId());
+  return pasta;
+}
+
+function limparNome_(t) {
+  return String(t).replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim().substring(0, 80);
+}
+
+function extensao_(mime) {
+  if (mime === 'application/pdf') return 'pdf';
+  if (mime === 'image/png') return 'png';
+  if (mime === 'image/webp') return 'webp';
+  return 'jpg';
+}
+
+function guardarArquivo_(d) {
+  var sh = aba_('Fichas');
+  var n = linhaDaFicha_(sh, d.id);
+  if (!n) return { ok: false, erro: 'Ficha não encontrada. O link pode ter sido cancelado pelo RH.' };
+  if (!d.dados) return { ok: false, erro: 'Arquivo vazio.' };
+
+  var mime = d.mime || 'image/jpeg';
+  if (mime.indexOf('image/') !== 0 && mime !== 'application/pdf') {
+    return { ok: false, erro: 'Só entram fotos e PDF.' };
+  }
+
+  /* base64 cresce um terço; volta ao tamanho real antes de conferir */
+  var bytesAprox = Math.floor(String(d.dados).length * 0.75);
+  if (bytesAprox > CFG.MAX_MB * 1024 * 1024) {
+    return { ok: false, erro: 'Arquivo acima de ' + CFG.MAX_MB + ' MB.' };
+  }
+
+  var o = obj_(sh.getRange(n, 1, 1, COLUNAS.length).getValues()[0]);
+  var pasta = pastaDaFicha_(sh, n, o);
+
+  var rotulo = limparNome_((d.rot || d.campo || 'documento') + (d.parte ? ' - ' + d.parte : ''));
+  var nomeArq = rotulo + '.' + extensao_(mime);
+
+  /* mesma parte enviada de novo substitui a anterior */
+  var antigos = pasta.getFilesByName(nomeArq);
+  while (antigos.hasNext()) antigos.next().setTrashed(true);
+
+  var blob = Utilities.newBlob(Utilities.base64Decode(d.dados), mime, nomeArq);
+  var arq = pasta.createFile(blob);
+
+  registrar_('arquivo', d.id, nomeArq);
+  return {
+    ok: true,
+    arquivo: {
+      campo: d.campo || '',
+      parte: d.parte || '',
+      driveId: arq.getId(),
+      nome: nomeArq,
+      mime: mime,
+      tamanho: arq.getSize(),
+      em: new Date().toISOString()
+    }
+  };
+}
+
+function tirarArquivo_(idFicha, driveId) {
+  var sh = aba_('Fichas');
+  if (!linhaDaFicha_(sh, idFicha)) return { ok: false, erro: 'Ficha não encontrada.' };
+  try { DriveApp.getFileById(driveId).setTrashed(true); } catch (e) {}
+  registrar_('arquivo removido', idFicha, driveId);
+  return { ok: true };
+}
+
+/* só o painel chama: devolve a imagem para exibir sem abrir o Drive */
+function baixarArquivo_(driveId) {
+  try {
+    var arq = DriveApp.getFileById(driveId);
+    var b = arq.getBlob();
+    return {
+      ok: true,
+      mime: b.getContentType(),
+      nome: arq.getName(),
+      dados: Utilities.base64Encode(b.getBytes())
+    };
+  } catch (e) {
+    return { ok: false, erro: 'Arquivo não encontrado no Drive.' };
+  }
+}
+
+/* ============================================================
    AÇÕES
    ============================================================ */
 
@@ -433,7 +586,7 @@ function listarFichas_() {
   if (ultima < 2) return { ok: true, fichas: [] };
 
   var valores = sh.getRange(2, 1, ultima - 1, COLUNAS.length).getValues();
-  var fora = { dados: 1, assinatura: 1 };
+  var fora = { dados: 1, assinatura: 1, pasta: 1 };
   var lista = [];
 
   for (var i = 0; i < valores.length; i++) {
@@ -482,6 +635,10 @@ function apagarFicha_(id) {
   var n = linhaDaFicha_(sh, id);
   if (!n) return { ok: false, erro: 'Ficha não encontrada.' };
   var nome = sh.getRange(n, COLUNAS.indexOf('candidato') + 1).getValue();
+  var pasta = sh.getRange(n, COLUNAS.indexOf('pasta') + 1).getValue();
+  if (pasta) {
+    try { DriveApp.getFolderById(pasta).setTrashed(true); } catch (e) {}
+  }
   sh.deleteRow(n);
   registrar_('apagar', id, nome);
   return { ok: true };

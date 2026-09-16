@@ -55,11 +55,12 @@ function montar() {
     '</dl></section>';
 
   html += '<div class="prazo">' +
-    '<div><b>Os documentos vão pelo WhatsApp, não por aqui.</b>' +
-    'Esta ficha guarda as suas respostas. Os arquivos digitalizados você manda para o RH no ' +
-    esc(window.formatarTel(rh.telRh)) + ', em PDF, com o seu nome e o nome do documento em cada arquivo. ' +
+    '<div><b>É tudo por aqui mesmo, pelo celular.</b>' +
+    'Fotografe cada documento na hora em que ele for pedido. A foto vai direto para o RH, ' +
+    'não precisa mandar nada por WhatsApp nem imprimir. ' +
     esc((window.ADM_CONFIG && window.ADM_CONFIG.textoPrazo) || '') +
-    (rh.telRh ? '<br><a class="zap" target="_blank" rel="noopener" href="' + zapLink(rh.telRh, rh.candidato) + '">Abrir conversa com o RH</a>' : '') +
+    ' Pode parar no meio e voltar depois pelo mesmo link: o que você já enviou fica guardado.' +
+    (rh.telRh ? '<br><a class="zap" target="_blank" rel="noopener" href="' + zapLink(rh.telRh, rh.candidato) + '">Falar com o RH</a>' : '') +
     '</div></div>';
 
   if (ENVIADA) {
@@ -82,6 +83,7 @@ function montar() {
   $('rodape').hidden = false;
 
   ligarEventos();
+  desenharTodasFotos(true);
   document.querySelectorAll('.marcar input').forEach(function (el) {
     el.closest('.marcar').classList.toggle('marcada', el.checked);
   });
@@ -99,7 +101,7 @@ function quando(iso) {
 function zapLink(tel, nome) {
   var n = String(tel).replace(/\D/g, '');
   if (n.length <= 11) n = '55' + n;
-  return 'https://wa.me/' + n + '?text=' + encodeURIComponent('Olá, sou ' + nome + '. Vou enviar os documentos da admissão.');
+  return 'https://wa.me/' + n + '?text=' + encodeURIComponent('Olá, sou ' + nome + '. É sobre a minha ficha de admissão.');
 }
 
 function blocoDeclaracoes() {
@@ -150,6 +152,16 @@ function campoHtml(c) {
       '<p class="msg-erro" hidden></p></div>';
   }
 
+  if (c.tipo === 'foto') {
+    return abre + '<label>' + esc(c.rot) +
+      (c.nota ? ' <span style="color:var(--fraco);font-weight:400">— ' + esc(c.nota) + '</span>' : '') +
+      '</label>' + ajuda +
+      (c.link ? '<p><a href="' + c.link + '" target="_blank" rel="noopener">' +
+        esc(c.linkRot || 'Abrir site') + '</a></p>' : '') +
+      '<div class="fotos" data-fotos="' + c.id + '"></div>' +
+      '<p class="msg-erro" hidden></p></div>';
+  }
+
   if (c.tipo === 'assinatura') {
     return abre + '<label>' + esc(c.rot) + '</label>' +
       '<p class="ajuda">Assine com o dedo, do jeito que você assina no papel.</p>' +
@@ -193,6 +205,7 @@ function ligarEventos() {
 
   tela.addEventListener('change', function (e) {
     var el = e.target;
+    if (el.dataset.arquivo) { receberArquivo(el); return; }
     if (el.tagName === 'SELECT' && el.dataset.id) { R[el.dataset.id] = el.value; agendar(); }
     if (el.type === 'checkbox' && el.dataset.id) {
       R[el.dataset.id] = el.checked;
@@ -218,6 +231,11 @@ function ligarEventos() {
       renderFilhos(); agendar(); return;
     }
     if (e.target.id === 'btnLimparAssina') { limparAssinatura(); return; }
+    var x = e.target.closest('[data-tirar]');
+    if (x) {
+      if (confirm('Remover este arquivo?')) tirarFoto(x.dataset.campo, x.dataset.tirar);
+      return;
+    }
   });
 
   $('btnEnviar').addEventListener('click', enviar);
@@ -337,6 +355,187 @@ function atualizarDataAssinatura() {
   if (el) el.textContent = R.assinaturaEm ? 'Assinado em ' + quando(R.assinaturaEm) : '';
 }
 
+/* ============================================================
+   FOTOS DOS DOCUMENTOS
+   ============================================================ */
+
+function campoPorId(id) {
+  var achado = null;
+  window.SECOES_CANDIDATO.forEach(function (s) {
+    s.campos.forEach(function (c) { if (c.id === id) achado = c; });
+  });
+  return achado;
+}
+
+/* Sem 'forcar', só preenche as caixas que ainda estão vazias.
+   Isso evita que o desenho aconteça no meio de um envio e apague
+   o 'Enviando…' que o candidato está vendo. */
+function desenharTodasFotos(forcar) {
+  document.querySelectorAll('[data-fotos]').forEach(function (box) {
+    if (forcar || !box.children.length) desenharFotos(box.dataset.fotos);
+  });
+}
+
+function desenharFotos(id) {
+  var box = document.querySelector('[data-fotos="' + id + '"]');
+  if (!box) return;
+  var c = campoPorId(id);
+  var arqs = window.arquivosDe(R, id);
+
+  var html = '';
+
+  if (c.partes && c.partes.length) {
+    c.partes.forEach(function (parte) {
+      var a = arqs.filter(function (x) { return x.parte === parte; })[0];
+      html += caixaFoto(c, parte, a);
+    });
+  } else {
+    arqs.forEach(function (a) { html += caixaFoto(c, '', a); });
+    if (!arqs.length || c.varios) html += caixaFoto(c, '', null);
+  }
+
+  box.innerHTML = html;
+}
+
+function caixaFoto(c, parte, arquivo) {
+  var chaveEntrada = c.id + '|' + parte + '|' + (arquivo ? arquivo.driveId : 'novo');
+  var titulo = parte || c.rot;
+
+  if (arquivo) {
+    var ehPdf = arquivo.mime === 'application/pdf';
+    return '<div class="foto pronta">' +
+      (ehPdf
+        ? '<div class="mini pdf">PDF</div>'
+        : '<img class="mini" alt="" src="' + (arquivo.previa || '') + '">') +
+      '<div class="foto-txt"><b>' + esc(titulo) + '</b>' +
+      '<span>' + esc(tamanho(arquivo.tamanho)) + ' · enviado</span></div>' +
+      '<button type="button" class="foto-x" data-tirar="' + esc(arquivo.driveId) +
+      '" data-campo="' + c.id + '" aria-label="Remover ' + esc(titulo) + '">×</button>' +
+      '</div>';
+  }
+
+  return '<label class="foto vazia" data-slot="' + esc(chaveEntrada) + '">' +
+    '<input type="file" accept="image/*,application/pdf"' +
+    (c.camera ? ' capture="' + c.camera + '"' : '') +
+    ' data-arquivo="' + c.id + '" data-parte="' + esc(parte) + '">' +
+    '<span class="foto-icone" aria-hidden="true">+</span>' +
+    '<span class="foto-txt"><b>' + esc(parte ? parte : (c.varios && window.arquivosDe(R, c.id).length ? 'Adicionar outra' : 'Enviar foto')) + '</b>' +
+    '<span>toque para usar a câmera ou escolher um arquivo</span></span>' +
+    '</label>';
+}
+
+function tamanho(bytes) {
+  if (!bytes) return '';
+  var kb = bytes / 1024;
+  return kb < 1024 ? Math.round(kb) + ' KB' : (kb / 1024).toFixed(1) + ' MB';
+}
+
+/* reduz a foto antes de subir: celular tira em 4000px e 4 MB,
+   e 1600px já deixa qualquer documento legível */
+function prepararArquivo(file) {
+  if (file.type === 'application/pdf') {
+    return lerBase64(file).then(function (d) {
+      return { mime: 'application/pdf', dados: d, previa: '' };
+    });
+  }
+  return new Promise(function (ok, erro) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      var max = 1600;
+      var e = Math.min(1, max / Math.max(img.width, img.height));
+      var w = Math.round(img.width * e), h = Math.round(img.height * e);
+      var cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      var ctx = cv.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      var completo = cv.toDataURL('image/jpeg', 0.78);
+
+      /* miniatura, só para aparecer na tela */
+      var mc = document.createElement('canvas');
+      var em = Math.min(1, 200 / Math.max(w, h));
+      mc.width = Math.round(w * em); mc.height = Math.round(h * em);
+      mc.getContext('2d').drawImage(cv, 0, 0, mc.width, mc.height);
+
+      ok({
+        mime: 'image/jpeg',
+        dados: completo.split(',')[1],
+        previa: mc.toDataURL('image/jpeg', 0.6)
+      });
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      erro(new Error('Não consegui abrir essa imagem. Tente tirar a foto de novo.'));
+    };
+    img.src = url;
+  });
+}
+
+function lerBase64(file) {
+  return new Promise(function (ok, erro) {
+    var fr = new FileReader();
+    fr.onload = function () { ok(String(fr.result).split(',')[1]); };
+    fr.onerror = function () { erro(new Error('Não consegui ler o arquivo.')); };
+    fr.readAsDataURL(file);
+  });
+}
+
+function receberArquivo(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var id = input.dataset.arquivo;
+  var parte = input.dataset.parte || '';
+  var c = campoPorId(id);
+  var caixa = input.closest('.foto');
+
+  if (file.size > 25 * 1024 * 1024) {
+    marcarErro(input.closest('.campo'), 'Esse arquivo tem mais de 25 MB. Tire a foto de novo com menos zoom.');
+    input.value = '';
+    return;
+  }
+
+  caixa.classList.add('subindo');
+  caixa.querySelector('.foto-txt b').textContent = 'Preparando…';
+  marcarErro(input.closest('.campo'), '');
+
+  prepararArquivo(file).then(function (pronto) {
+    caixa.querySelector('.foto-txt b').textContent = 'Enviando…';
+    return window.API.enviarArquivo(ID, id, c.rot, parte, pronto).then(function (meta) {
+      meta.previa = pronto.previa;
+      guardarArquivo(id, parte, meta, c);
+      desenharFotos(id);
+      agendar();
+    });
+  }).catch(function (e) {
+    caixa.classList.remove('subindo');
+    desenharFotos(id);
+    marcarErro(document.querySelector('[data-campo="' + id + '"]'),
+      'Não enviou. ' + e.message + ' Toque de novo para tentar.');
+  });
+}
+
+function guardarArquivo(id, parte, meta, c) {
+  var lista = window.arquivosDe(R, id).slice();
+  if (parte) {
+    lista = lista.filter(function (a) { return a.parte !== parte; });
+  } else if (!c.varios) {
+    lista = [];
+  }
+  lista.push(meta);
+  R[id] = lista;
+}
+
+function tirarFoto(campo, driveId) {
+  var lista = window.arquivosDe(R, campo).filter(function (a) { return a.driveId !== driveId; });
+  R[campo] = lista.length ? lista : null;
+  desenharFotos(campo);
+  agendar();
+  window.API.tirarArquivo(ID, driveId).catch(function () {});
+}
+
 /* ---------- estado ---------- */
 function atualizar() {
   /* mostra e esconde condicionais */
@@ -344,6 +543,8 @@ function atualizar() {
     var el = document.querySelector('[data-campo="' + c.id + '"]');
     if (el) el.hidden = !window.campoVisivel(c, R);
   });
+
+  desenharTodasFotos();
 
   var faltas = window.pendencias(R);
   var porSecao = {};
@@ -432,11 +633,10 @@ function sucesso() {
 
     '<div class="aviso bom">O RH já recebeu o que você preencheu.</div>' +
 
-    '<div class="prazo"><div><b>Agora mande os documentos.</b>' +
-    'Esta ficha não carrega arquivos. Os documentos digitalizados vão em PDF para o WhatsApp do RH, ' +
-    'cada arquivo nomeado com o seu nome e o nome do documento. ' +
-    esc((window.ADM_CONFIG && window.ADM_CONFIG.textoPrazo) || '') +
-    (rh.telRh ? '<br><a class="zap" target="_blank" rel="noopener" href="' + zapLink(rh.telRh, rh.candidato) + '">Abrir conversa com o RH</a>' : '') +
+    '<div class="prazo"><div><b>Não precisa mandar mais nada.</b>' +
+    'Os documentos que você fotografou já chegaram junto com a ficha. ' +
+    'Se o RH precisar de alguma correção, vai te chamar por aqui mesmo ou pelo telefone.' +
+    (rh.telRh ? '<br><a class="zap" target="_blank" rel="noopener" href="' + zapLink(rh.telRh, rh.candidato) + '">Falar com o RH</a>' : '') +
     '</div></div>' +
 
     '<div class="btn-linha" style="margin-top:20px">' +

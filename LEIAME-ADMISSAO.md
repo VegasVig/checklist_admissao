@@ -1,8 +1,9 @@
 # Ficha de admissão — Vegas
 
 Substitui o check list em Word. O RH preenche o que era vermelho, manda um link,
-o candidato termina de preencher no celular, e tudo cai numa planilha do Google.
-Do painel você acompanha, anota e exporta o PDF da ficha.
+o candidato termina de preencher no celular **e fotografa cada documento ali mesmo**.
+As respostas caem numa planilha do Google e as fotos numa pasta do Drive, uma por
+candidato. Do painel você acompanha, vê os documentos, anota e exporta o PDF.
 
 É um sistema fechado em si: site próprio, planilha própria, Apps Script próprio,
 chave própria. Não precisa de nada de fora para funcionar.
@@ -31,6 +32,12 @@ chave própria. Não precisa de nada de fora para funcionar.
 ## Instalar
 
 ### 1. O backend
+
+O script precisa de autorização para mexer na planilha **e no Drive**. Se você já
+tinha instalado a versão anterior, que não usava o Drive, o Google vai pedir a
+autorização de novo: rode `instalar()` uma vez no editor e aceite. Sem isso, o
+envio de fotos falha e o resto continua funcionando, o que engana.
+
 
 1. Acesse **script.google.com** e crie um projeto novo
 2. Apague o `Code.gs` em branco e cole o conteúdo de **`Admissao.gs`** inteiro
@@ -139,14 +146,36 @@ conta. O que ele digita fica salvo no aparelho a cada toque: se acabar a bateria
 cair a internet, ele reabre o link e continua de onde parou. O rodapé mostra o tempo
 todo quantos itens faltam e quais são.
 
-**Os documentos continuam indo pelo WhatsApp.** A ficha registra as respostas, não
-carrega arquivos. Isso foi mantido de propósito: os originais do check list mandam
-enviar em PDF nomeado, e em caso urgente por mensagem temporária, o que não
-funcionaria se os arquivos ficassem parados num Drive.
+**Os documentos sobem pela própria ficha.** Cada documento tem a sua caixa. O
+candidato toca, a câmera abre, ele fotografa e a imagem vai direto para a pasta dele
+no Drive. Não passa por WhatsApp e não precisa de scanner.
+
+O aplicativo reduz a foto para 1600 pixels antes de subir. Uma foto de 4 MB do
+celular chega ao Drive com uns 250 KB, ainda legível para conferir um RG, e sobe
+rápido mesmo em sinal ruim. Cada arquivo vai numa requisição própria: se a internet
+cair no meio, só aquela foto falha e o candidato toca de novo.
+
+Alguns documentos pedem mais de uma foto, e a ficha só considera completo quando
+todas chegam: RG, CNH, reservista e CNV pedem frente e verso, e a caderneta de
+vacinação pede a página de identificação e a página das doses. Certidão de
+nascimento dos filhos, CPF dos filhos, frequência escolar, certidão criminal
+estadual e documento de pensão aceitam várias — é só ir tocando em adicionar.
+
+PDF também serve, e é o formato natural das três certidões negativas e da CTPS
+digital.
+
+**A foto 3x4 virou selfie com fundo branco.** É mais fácil de conseguir na hora,
+não custa nada ao candidato e serve para o mesmo fim: o crachá e o reconhecimento
+no posto. A ficha explica como tirar — de frente para parede branca, rosto inteiro,
+sem boné, sem óculos escuros, luz de frente.
 
 **Conferir.** Na aba Fichas você vê quem já respondeu. Abra uma ficha para ler tudo,
 escrever a observação (documento que faltou e o motivo) e marcar como conferida.
 A observação sai no PDF.
+
+**Ver os documentos.** Dentro da ficha, os documentos aparecem em cartões com a
+miniatura. Clicar abre em tamanho grande. A imagem vem do Drive na hora, e só para
+quem entrou com usuário e senha — os arquivos nunca ficam públicos.
 
 **Exportar.** O botão PDF abre o documento pronto numa aba nova. Toque em imprimir e
 escolha salvar em PDF. Funciona no celular e no computador. Sai com a logo, os
@@ -159,14 +188,18 @@ dados do posto, todas as respostas, as quatro declarações e a assinatura do ca
 Tudo está em `js/campos.js`, num formato legível. Para acrescentar uma pergunta,
 copie uma linha parecida e mude o `id`, o `rot` e o `tipo`.
 
-Tipos disponíveis: `check` (caixa de marcar), `simnao`, `texto`, `tel`, `email`,
-`cpf`, `data`, `num`, `moeda`, `opcao` (lista), `area` (texto longo),
-`filhos` e `assinatura`.
+Tipos disponíveis: `foto` (envio de imagem ou PDF), `check` (caixa de marcar),
+`simnao`, `texto`, `tel`, `email`, `cpf`, `data`, `num`, `moeda`, `opcao` (lista),
+`area` (texto longo), `filhos` e `assinatura`.
 
 - `obrig: true` faz o item entrar na conta do que falta
 - `se: 'campo=Valor'` só mostra a pergunta quando a outra foi respondida assim
 - `nota: 'texto'` põe uma observação cinza ao lado do rótulo
 - `link` e `linkRot` colocam um link, como nas certidões
+- nos campos `foto`: `partes: ['Frente','Verso']` pede uma foto para cada parte e
+  só dá o documento por completo quando todas chegam; `varios: true` deixa o
+  candidato mandar quantas quiser; `camera: 'user'` abre a câmera frontal, que é o
+  que a selfie usa
 
 Uma regra especial: a ATA vira obrigatória sozinha quando a função digitada pelo RH
 contém "vigilante". É a exigência da Lei 7.102/1983 e da Portaria 3.233/2012 da
@@ -201,10 +234,16 @@ usuário: o registro de acesso na aba Log mostra quem entrou e quando. Saiu algu
 **A planilha é o cofre.** Compartilhe com o mínimo de pessoas. Ela tem CPF, conta
 bancária e nome de filho menor.
 
-**Apague o que não serve mais.** Guardar dado bancário de quem não foi contratado,
-sem prazo, é passivo. A função `fichasParaExpurgo` lista o que passou de 24 meses;
-o prazo está em `CFG.RETENCAO_MESES`, no começo do `Admissao.gs`. Rode de vez em
-quando e apague o que já cumpriu a finalidade.
+**As fotos ficam privadas.** Elas vão para a pasta `Vegas — Documentos de admissão`
+no Drive da conta que instalou o script, organizadas por mês e por candidato.
+Ninguém acessa por link: quem precisa ver, vê pelo painel, depois de entrar com
+usuário e senha. Compartilhe essa pasta do Drive com o mínimo de gente.
+
+**Apague o que não serve mais.** Guardar RG, CPF e conta bancária de quem não foi
+contratado, sem prazo, é passivo. A função `fichasParaExpurgo` lista o que passou de
+24 meses; o prazo está em `CFG.RETENCAO_MESES`, no começo do `Admissao.gs`. Rode de
+vez em quando e apague o que já cumpriu a finalidade. Apagar a ficha no painel manda
+a pasta de documentos dela para a lixeira do Drive junto.
 
 **Ficha cancelada.** Apagar a ficha no painel tira a linha da planilha e derruba o
 link. Use quando a vaga cair.
@@ -222,6 +261,8 @@ link. Use quando a vaga cair.
 | *O servidor respondeu em formato inesperado* | A publicação não está como "Qualquer pessoa". Refaça o passo 6. |
 | O painel some depois de editar o `Admissao.gs` | Você criou implantação nova. Volte para a implantação antiga ou atualize a URL no `config.js`. |
 | O PDF não abre | O navegador bloqueou a aba nova. Libere pop-ups para o endereço do site. Acontece uma vez por aparelho. |
+| A foto não sobe e dá erro | Quase sempre é autorização do Drive faltando. Rode `instalar()` uma vez no editor do Apps Script e aceite as permissões. |
+| *Arquivo acima de 10 MB* | PDF grande demais. Fotos o aplicativo reduz sozinho; PDF vai como veio. Peça para fotografar em vez de anexar o PDF. |
 | A data aparece mm/dd/aaaa | É o idioma do navegador, não do site. Em celular configurado em português sai dd/mm/aaaa. |
 | Candidato diz que perdeu o que preencheu | Peça para reabrir o mesmo link no mesmo navegador. O rascunho fica no aparelho. Se ele trocou de celular, aí perdeu mesmo. |
 
