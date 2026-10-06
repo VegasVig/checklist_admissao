@@ -34,7 +34,11 @@ function atualizarTopo() {
 
 function render() {
   atualizarTopo();
-  if (!window.API.autenticado()) { $('abas').hidden = true; return telaAcesso(); }
+  var logado = window.API.autenticado();
+  /* as fotos dos lados só aparecem na abertura e na entrada:
+     a lista de fichas precisa da largura toda para a tabela */
+  document.body.classList.toggle('com-lados', !logado || ABA === 'nova');
+  if (!logado) { $('abas').hidden = true; return telaAcesso(); }
   $('abas').hidden = false;
   if (ABA === 'nova') telaNova(); else telaFichas();
 }
@@ -86,9 +90,10 @@ function telaAcesso() {
     return;
   }
   $('tela').innerHTML =
-    '<div style="max-width:440px;margin:56px auto">' +
-    '<h1 style="font-size:26px;margin:0 0 6px;letter-spacing:-.02em">Entrar no painel</h1>' +
-    '<p style="color:var(--fraco);margin:0 0 26px">Painel de admissões da Vegas. ' +
+    '<div class="acesso cartao-aco">' +
+    '<img class="escudo-grande" src="img/escudo.png" alt="Vegas Vigilância e Segurança">' +
+    '<h1>Entrar no painel</h1>' +
+    '<p class="sub">Painel de admissões da Vegas. ' +
     'Só quem trabalha com as fichas entra aqui.</p>' +
 
     (temUrl ? '' :
@@ -160,20 +165,37 @@ function telaAcesso() {
 /* ============================================================
    nova ficha
    ============================================================ */
+
+/* ícones dos campos do RH, traço fino na cor do aço */
+function svgIcone(d) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>'; }
+var ICONE_PESSOA_CHEIO =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.5" r="4.5"/>' +
+  '<path d="M3.5 21.5c.7-5 4.1-8 8.5-8s7.8 3 8.5 8z"/></svg>';
+var ICONES_RH = {
+  razao:     svgIcone('<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="11" r="2.3"/><path d="M5.8 17c.5-1.9 1.7-2.9 3.2-2.9s2.7 1 3.2 2.9M14.5 10h3.5M14.5 13.5h3.5"/>'),
+  cnpj:      svgIcone('<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><circle cx="12" cy="11.5" r="2.6"/>'),
+  posto:     svgIcone('<path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-6h6v6M8 11h2M14 11h2"/>'),
+  candidato: svgIcone('<circle cx="12" cy="8" r="3.8"/><path d="M4.5 20.5c.8-4 3.7-6.5 7.5-6.5s6.7 2.5 7.5 6.5"/>'),
+  whatsapp:  svgIcone('<path d="M4.5 19.5l1.2-3.6A8 8 0 1 1 8.6 19z"/><path d="M9.2 8.6c.3 2.9 2.3 5 5.2 5.9l1.1-1.2-1.8-1-1 .8c-.9-.4-1.6-1.1-2-2l.8-1-1-1.8z"/>'),
+  funcao:    svgIcone('<rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M9 7.5V5.5c0-.8.7-1.5 1.5-1.5h3c.8 0 1.5.7 1.5 1.5v2M3 13h18"/>'),
+  salario:   svgIcone('<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>'),
+  horario:   svgIcone('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  admissao:  svgIcone('<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M13 14h2M8 17h2"/>'),
+  telRh:     svgIcone('<path d="M6.5 3.5h3l1.5 4.5-2 1.3a11 11 0 0 0 5.7 5.7l1.3-2 4.5 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2z"/>')
+};
+
 function telaNova() {
-  var emp = (window.ADM_CONFIG && window.ADM_CONFIG.empresa) || {};
-  var ult = lerUltima();
+  var emp = padraoEmpresa();
+  esquecerUltima();
 
   $('tela').innerHTML =
-    '<div style="max-width:720px">' +
-    '<h1 style="font-size:27px;margin:0 0 6px;letter-spacing:-.02em">Abrir uma ficha</h1>' +
-    '<p style="color:var(--fraco);margin:0 0 22px">Preencha o que era vermelho no documento. ' +
+    '<div class="cartao-aco">' +
+    '<h1 class="titulo-icone">' + ICONE_PESSOA_CHEIO + 'Abrir uma ficha</h1>' +
+    '<p class="sub">Preencha o que era vermelho no documento. ' +
     'O resto é o candidato que responde, pelo link.</p>' +
     '<section class="secao"><div class="corpo">' +
       window.CAMPOS_RH.map(function (c) {
-        var v = emp[c.id] || ult[c.id] || '';
-        if (c.id === 'candidato' || c.id === 'whatsapp') v = '';
-        return campoRh(c, v);
+        return campoRh(c, emp[c.id] || '');
       }).join('') +
     '</div></section>' +
     '<div class="btn-linha" style="margin-top:18px">' +
@@ -194,9 +216,9 @@ function campoRh(c, v) {
   var larg = c.larg === 'cheia' ? ' cheia' : '';
   var tipo = c.tipo === 'data' ? 'date' : (c.tipo === 'tel' || c.tipo === 'cnpj') ? 'tel' : 'text';
   return '<div class="campo' + larg + '" data-campo="' + c.id + '">' +
-    '<label for="r_' + c.id + '">' + esc(c.rot) + (c.obrig ? '' : ' <span style="color:var(--fraco);font-weight:400">(opcional)</span>') + '</label>' +
+    '<label class="com-icone" for="r_' + c.id + '">' + (ICONES_RH[c.id] || '') + '<span>' + esc(c.rot) + (c.obrig ? '' : ' <i style="color:var(--fraco);font-weight:400;font-style:normal">(opcional)</i>') + '</span></label>' +
     (c.ajuda ? '<p class="ajuda">' + esc(c.ajuda) + '</p>' : '') +
-    '<input type="' + tipo + '" id="r_' + c.id + '" data-id="' + c.id + '" data-tipo="' + c.tipo + '"' +
+    '<input type="' + tipo + '" id="r_' + c.id + '" data-id="' + c.id + '" data-tipo="' + c.tipo + '" autocomplete="off"' +
     (c.dica ? ' placeholder="' + esc(c.dica) + '"' : '') + ' value="' + esc(v) + '">' +
     '<p class="msg-erro" hidden></p></div>';
 }
@@ -220,11 +242,11 @@ function criar() {
     return toast('Confira os campos destacados');
   }
 
-  gravarUltima(rh);
   var b = $('btnCriar'); b.disabled = true; b.textContent = 'Criando…';
 
   window.API.criar(rh).then(function (r) {
     b.disabled = false; b.textContent = 'Gerar link do candidato';
+    limparNova();
     mostrarLink(r.id, rh);
   }).catch(function (e) {
     b.disabled = false; b.textContent = 'Gerar link do candidato';
@@ -270,12 +292,33 @@ function mostrarLink(id, rh) {
   $('novaMsg').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function lerUltima() {
-  try { return JSON.parse(localStorage.getItem('adm_ultima')) || {}; } catch (e) { return {}; }
+/* dados fixos da empresa, vindos do js/config.js (razão, CNPJ, telefone).
+   Nada do candidato anterior entra aqui. */
+function padraoEmpresa() {
+  return (window.ADM_CONFIG && window.ADM_CONFIG.empresa) || {};
 }
-function gravarUltima(rh) {
-  var g = { razao: rh.razao, cnpj: rh.cnpj, posto: rh.posto, telRh: rh.telRh, horario: rh.horario, funcao: rh.funcao };
-  try { localStorage.setItem('adm_ultima', JSON.stringify(g)); } catch (e) {}
+
+/* versões antigas guardavam a última ficha neste aparelho e
+   preenchiam a próxima com ela. Apaga o que tiver sobrado. */
+function esquecerUltima() {
+  try { localStorage.removeItem('adm_ultima'); } catch (e) {}
+}
+
+/* depois que o link sai, o formulário volta em branco
+   (só com o padrão do config.js) para o próximo candidato */
+function limparNova() {
+  var emp = padraoEmpresa();
+  window.CAMPOS_RH.forEach(function (c) {
+    var el = $('r_' + c.id); if (!el) return;
+    el.value = emp[c.id] || '';
+    var campo = el.closest('.campo');
+    if (campo) {
+      campo.classList.remove('erro');
+      var p = campo.querySelector('.msg-erro');
+      if (p) { p.textContent = ''; p.hidden = true; }
+    }
+  });
+  esquecerUltima();
 }
 
 /* ============================================================

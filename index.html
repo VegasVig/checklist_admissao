@@ -4,22 +4,55 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="theme-color" content="#0f1216">
+<meta name="theme-color" content="#070b11">
 <title>Admissões — Vegas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap">
 <link rel="stylesheet" href="css/admissao.css">
 </head>
-<body class="escuro">
+<body class="escuro painel">
 
 <header class="topo">
-  <img id="logoTopo" alt="Vegas Vigilância e Segurança">
-  <span class="t">Admissões</span>
-  <nav class="abas" id="abas" hidden>
-    <button data-aba="nova" class="on">Nova ficha</button>
-    <button data-aba="fichas">Fichas</button>
-  </nav>
+  <div class="marca">
+    <img class="escudo" src="img/escudo.png" alt="">
+    <img id="logoTopo" class="nome" alt="Vegas Vigilância e Segurança">
+  </div>
+  <p class="lema">Pessoas seguras<br>fazem um mundo<br><b>mais seguro</b></p>
+  <div class="topo-dir">
+    <nav class="abas" id="abas" hidden>
+      <button data-aba="nova" class="on">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Nova ficha
+      </button>
+      <button data-aba="fichas">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>Fichas
+      </button>
+    </nav>
+    <span class="t"></span>
+  </div>
 </header>
 
-<main class="env largo" id="tela"></main>
+<div class="palco">
+  <aside class="lado esq" aria-hidden="true">
+    <div class="foto-lado" style="background-image:url(img/guarda.jpg)"></div>
+    <img class="escudo-fundo" src="img/escudo.png" alt="">
+  </aside>
+
+  <main class="env largo" id="tela"></main>
+
+  <aside class="lado dir" aria-hidden="true">
+    <div class="foto-lado camera" style="background-image:url(img/camera.jpg)"></div>
+    <ul class="valores">
+      <li><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
+        <span><b>Tecnologia</b>e monitoramento</span></li>
+      <li><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.6-3.6 3.2-5.8 6.5-5.8s5.9 2.2 6.5 5.8"/><circle cx="5" cy="9.5" r="2.2"/><circle cx="19" cy="9.5" r="2.2"/></svg>
+        <span><b>Equipe</b>especializada</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
+        <span><b>Compromisso</b>com a sua segurança</span></li>
+    </ul>
+    <div class="foto-lado cidade" style="background-image:url(img/cidade.jpg)"></div>
+  </aside>
+</div>
 
 <dialog id="janela">
   <div class="cab">
