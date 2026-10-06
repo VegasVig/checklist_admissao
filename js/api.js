@@ -36,29 +36,65 @@ window.API = {
   configurada: function () { return !!this.url(); },
   autenticado: function () { return !!(this.url() && this.chaveRh()); },
 
+  /* Ações que podem ser repetidas sem estragar nada: ler, listar,
+     salvar por cima, trocar a mesma foto. "criar" e "apagar" ficam de
+     fora: se a primeira tentativa chegou e só a resposta se perdeu,
+     repetir abriria uma ficha duplicada. */
+  REPETIVEIS: { ping: 1, ler: 1, listar: 1, detalhe: 1, baixar: 1, login: 1,
+                salvar: 1, anotar: 1, arquivo: 1, tirarArquivo: 1 },
+
   chamar: function (acao, dados, comChave) {
     var u = this.url();
     if (!u) return Promise.reject(new Error('Endereço da planilha não configurado.'));
     var corpo = Object.assign({ acao: acao }, dados || {});
     if (comChave) corpo.chave = this.chaveRh();
+    var corpoTxt = JSON.stringify(corpo);
+    var tentativas = this.REPETIVEIS[acao] ? 3 : 1;
 
-    return fetch(u, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(corpo)
-    })
-    .then(function (r) { return r.text(); })
-    .then(function (t) {
-      var j;
-      try { j = JSON.parse(t); }
-      catch (e) { throw new Error('O servidor respondeu em formato inesperado. Verifique se a publicação está como "Qualquer pessoa".'); }
-      if (!j.ok) throw new Error(j.erro || 'Erro no servidor.');
-      return j;
-    })
-    .catch(function (e) {
-      if (e.message === 'Failed to fetch') throw new Error('Sem conexão com a planilha. Verifique a internet e o endereço publicado.');
-      throw e;
-    });
+    function uma() {
+      return fetch(u, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: corpoTxt
+      })
+      .then(function (r) {
+        if (!r.ok) { var e = new Error('http ' + r.status); e.instavel = true; throw e; }
+        return r.text();
+      })
+      .then(function (t) {
+        var j;
+        try { j = JSON.parse(t); }
+        catch (e) { var e2 = new Error('formato'); e2.instavel = true; throw e2; }
+        /* erro de verdade, vindo do nosso código: não adianta repetir */
+        if (!j.ok) throw new Error(j.erro || 'Erro no servidor.');
+        return j;
+      })
+      .catch(function (e) {
+        /* "Failed to fetch" é como o navegador relata o bloqueio de CORS
+           que o Google provoca quando se atrapalha no redirecionamento */
+        if (e instanceof TypeError) e.instavel = true;
+        throw e;
+      });
+    }
+
+    function tentar(n) {
+      return uma().catch(function (e) {
+        if (!e.instavel) throw e;
+        if (n < tentativas) {
+          return new Promise(function (ok) { setTimeout(ok, 1200 * n); })
+            .then(function () { return tentar(n + 1); });
+        }
+        if (navigator.onLine === false) throw new Error('Sem internet neste aparelho. Confira a conexão e tente de novo.');
+        if (acao === 'criar') {
+          throw new Error('A planilha do Google não confirmou a criação. Antes de tentar de novo, ' +
+            'olhe a aba Fichas: a ficha pode ter sido criada mesmo assim.');
+        }
+        throw new Error('A planilha do Google não respondeu agora. Isso costuma ser instabilidade ' +
+          'passageira do Google: espere alguns segundos e tente de novo.');
+      });
+    }
+
+    return tentar(1);
   },
 
   entrar: function (usuario, senha) {
