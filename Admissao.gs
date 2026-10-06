@@ -549,6 +549,27 @@ function lerFicha_(id) {
   return { ok: true, ficha: f };
 }
 
+/* tira a "previa" (miniatura em base64) de cada arquivo da ficha.
+   manterSelfie: deixa a da selfie, se for pequena. */
+function semPrevias_(dados, manterSelfie) {
+  var saida = {};
+  for (var k in dados) {
+    if (!dados.hasOwnProperty(k)) continue;
+    var v = dados[k];
+    var lista = Array.isArray(v) ? v : (v && typeof v === 'object' && v.driveId ? [v] : null);
+    if (!lista) { saida[k] = v; continue; }
+    var limpa = lista.map(function (a) {
+      if (!a || typeof a !== 'object') return a;
+      var c = {};
+      for (var j in a) if (a.hasOwnProperty(j) && j !== 'previa') c[j] = a[j];
+      if (manterSelfie && k === 'doc_selfie' && a.previa && a.previa.length < 15000) c.previa = a.previa;
+      return c;
+    });
+    saida[k] = Array.isArray(v) ? limpa : limpa[0];
+  }
+  return saida;
+}
+
 function salvarFicha_(id, dados) {
   if (!dados || typeof dados !== 'object') return { ok: false, erro: 'Nada para salvar.' };
 
@@ -562,8 +583,15 @@ function salvarFicha_(id, dados) {
     if (dados.hasOwnProperty(k) && k !== 'assinatura') copia[k] = dados[k];
   }
 
-  var texto = JSON.stringify(copia);
-  if (texto.length > 45000) return { ok: false, erro: 'Ficha grande demais para salvar. Avise o RH.' };
+  /* as miniaturas das fotos só servem para a tela do candidato: a foto
+     de verdade já está no Drive. Somadas, estouravam o limite de 50 mil
+     caracteres da célula. Fica só a da selfie, que vira o retrato do PDF. */
+  var texto = JSON.stringify(semPrevias_(copia, true));
+  if (texto.length > 45000) texto = JSON.stringify(semPrevias_(copia, false));
+  if (texto.length > 45000) {
+    return { ok: false, erro: 'A ficha passou do tamanho que a planilha aceita (' +
+      Math.round(texto.length / 1000) + ' mil caracteres). Avise o RH.' };
+  }
   if (assinatura.length > 45000) assinatura = '';
 
   var atual = obj_(sh.getRange(n, 1, 1, COLUNAS.length).getValues()[0]);

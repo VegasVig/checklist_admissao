@@ -406,7 +406,9 @@ function caixaFoto(c, parte, arquivo) {
     return '<div class="foto pronta">' +
       (ehPdf
         ? '<div class="mini pdf">PDF</div>'
-        : '<img class="mini" alt="" src="' + (arquivo.previa || '') + '">') +
+        : (arquivo.previa
+            ? '<img class="mini" alt="" src="' + arquivo.previa + '">'
+            : '<div class="mini pdf">FOTO</div>')) +
       '<div class="foto-txt"><b>' + esc(titulo) + '</b>' +
       '<span>' + esc(tamanho(arquivo.tamanho)) + ' · enviado</span></div>' +
       '<button type="button" class="foto-x" data-tirar="' + esc(arquivo.driveId) +
@@ -517,6 +519,25 @@ function receberArquivo(input) {
   });
 }
 
+/* cópia das respostas sem as miniaturas das fotos (menos a da selfie,
+   que vai no PDF). A foto inteira já está no Drive; a miniatura só
+   enchia o pacote até a planilha recusar. No celular elas continuam. */
+function paraEnviar(resp) {
+  var saida = {};
+  Object.keys(resp).forEach(function (k) {
+    var v = resp[k];
+    var lista = Array.isArray(v) ? v : (v && typeof v === 'object' && v.driveId ? [v] : null);
+    if (!lista) { saida[k] = v; return; }
+    var limpa = lista.map(function (a) {
+      var c = Object.assign({}, a);
+      if (k !== 'doc_selfie') delete c.previa;
+      return c;
+    });
+    saida[k] = Array.isArray(v) ? limpa : limpa[0];
+  });
+  return saida;
+}
+
 function guardarArquivo(id, parte, meta, c) {
   var lista = window.arquivosDe(R, id).slice();
   if (parte) {
@@ -614,7 +635,7 @@ function enviar() {
 
   var btn = $('btnEnviar');
   btn.disabled = true; btn.textContent = 'Enviando…';
-  window.API.salvar(ID, R).then(function () {
+  window.API.salvar(ID, paraEnviar(R)).then(function () {
     window.Rascunho.limpar(ID);
     sucesso();
   }).catch(function (e) {

@@ -583,7 +583,7 @@ function grade(campos, d) {
         'data-pdf="' + (ehPdf ? '1' : '') + '">' +
         (a.previa
           ? '<img src="' + a.previa + '" alt="">'
-          : '<div class="vazio-mini">' + (ehPdf ? 'PDF' : 'abrir') + '</div>') +
+          : '<div class="vazio-mini">' + (ehPdf ? 'PDF' : 'Ver foto') + '</div>') +
         '<div class="rot"><b>' + esc(c.rot) + '</b>' + esc(a.parte || '') + '</div>' +
         '</button>';
     });
