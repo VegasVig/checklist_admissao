@@ -374,17 +374,9 @@ body.painel .abas[hidden] + .t{display:none}
   border:1px solid var(--campo-linha);border-radius:10px;
   padding:10px 12px;background:var(--campo);min-height:66px;
 }
-.foto.vazia{border-style:dashed;flex-wrap:wrap}
+.foto.vazia{border-style:dashed;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer}
+.foto.vazia:hover{border-color:var(--ambar)}
 .foto.vazia input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-.foto-acoes{display:flex;gap:8px;width:100%}
-.foto-cam,.foto-arq{
-  flex:1;min-height:44px;border-radius:9px;display:grid;place-items:center;cursor:pointer;
-  font:600 14.5px var(--fonte);position:relative;
-}
-.foto-cam{background:var(--ambar);color:#151004;border:1px solid var(--ambar)}
-.foto-arq{background:transparent;color:var(--texto);border:1px solid var(--campo-linha)}
-.foto-arq:focus-within,.foto-cam:focus-visible{outline:3px solid var(--ambar);outline-offset:2px}
-.foto.subindo .foto-acoes{display:none}
 
 body.com-cam{overflow:hidden}
 .cam{position:fixed;inset:0;z-index:1000;background:#000;color:#fff;display:flex;flex-direction:column;

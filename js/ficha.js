@@ -44,29 +44,6 @@ function escolherDados(ficha, rascunho) {
   return r;
 }
 
-/* Android costuma matar a aba enquanto o app da câmera está aberto.
-   A marca na sessão sobrevive à recarga e permite avisar o candidato. */
-var CAMERA = 'adm_camera_' + ID;
-function marcarCamera(campo, parte) {
-  try { sessionStorage.setItem(CAMERA, JSON.stringify({ campo: campo, parte: parte || '', t: Date.now() })); } catch (e) {}
-}
-function limparCamera() { try { sessionStorage.removeItem(CAMERA); } catch (e) {} }
-function conferirVoltaDaCamera() {
-  var m = null;
-  try { m = JSON.parse(sessionStorage.getItem(CAMERA)); } catch (e) {}
-  limparCamera();
-  if (!m || Date.now() - m.t > 10 * 60 * 1000) return;
-  var ja = window.arquivosDe(R, m.campo).some(function (a) { return (a.parte || '') === m.parte; });
-  var campo = document.querySelector('[data-campo="' + m.campo + '"]');
-  if (ja || !campo) return;
-  marcarErro(campo, 'O celular fechou a página enquanto a galeria estava aberta e o arquivo se perdeu. ' +
-    'Use o botão Câmera: ele fotografa sem sair da página. Fechar outras abas do navegador também ajuda.');
-  setTimeout(function () { campo.scrollIntoView({ block: 'center' }); }, 300);
-}
-document.addEventListener('visibilitychange', function () {
-  if (document.visibilityState === 'visible') setTimeout(limparCamera, 4000);
-});
-
 function falhar(titulo, texto) {
   $('tela').innerHTML = '<div class="vazio"><h1 style="font-size:22px;margin:0 0 8px">' +
     esc(titulo) + '</h1><p>' + esc(texto) + '</p></div>';
@@ -123,7 +100,6 @@ function montar() {
   });
   prepararAssinatura();
   atualizar();
-  conferirVoltaDaCamera();
 }
 
 function primeiroNome(n) { return String(n || '').trim().split(/\s+/)[0] || 'Olá'; }
@@ -252,11 +228,6 @@ function ligarEventos() {
   tela.addEventListener('click', function (e) {
     var cam = e.target.closest('[data-cam]');
     if (cam) { abrirCamera(cam.dataset.cam, cam.dataset.parte || ''); return; }
-    var arq = e.target.closest('.foto-arq');
-    if (arq) {
-      var inp = arq.querySelector('input[data-arquivo]');
-      if (inp) marcarCamera(inp.dataset.arquivo, inp.dataset.parte);
-    }
     var b = e.target.closest('.simnao button');
     if (b) {
       var id = b.parentNode.dataset.id;
@@ -458,17 +429,12 @@ function caixaFoto(c, parte, arquivo) {
       '</div>';
   }
 
-  return '<div class="foto vazia" data-slot="' + esc(chaveEntrada) + '">' +
+  return '<button type="button" class="foto vazia" data-slot="' + esc(chaveEntrada) + '"' +
+    ' data-cam="' + c.id + '" data-parte="' + esc(parte) + '">' +
     '<span class="foto-icone" aria-hidden="true">+</span>' +
-    '<span class="foto-txt"><b>' + esc(parte ? parte : (c.varios && window.arquivosDe(R, c.id).length ? 'Adicionar outra' : 'Enviar foto')) + '</b>' +
-    '<span>fotografe agora ou escolha um arquivo do celular</span></span>' +
-    '<div class="foto-acoes">' +
-      '<button type="button" class="foto-cam" data-cam="' + c.id + '" data-parte="' + esc(parte) + '">Câmera</button>' +
-      '<label class="foto-arq">Arquivo' +
-        '<input type="file" accept="image/*,application/pdf" data-arquivo="' + c.id + '" data-parte="' + esc(parte) + '">' +
-      '</label>' +
-    '</div>' +
-    '</div>';
+    '<span class="foto-txt"><b>' + esc(parte ? parte : (c.varios && window.arquivosDe(R, c.id).length ? 'Adicionar outra' : 'Tirar foto')) + '</b>' +
+    '<span>toque para abrir a câmera</span></span>' +
+    '</button>';
 }
 
 function tamanho(bytes) {
@@ -503,12 +469,6 @@ function prepararArquivo(file) {
   });
 }
 
-function comPrazo(p, ms, msg) {
-  return Promise.race([p, new Promise(function (_, erro) {
-    setTimeout(function () { erro(new Error(msg)); }, ms);
-  })]);
-}
-
 function desenharPronto(fonte, w, h, qualidade) {
   var cv = document.createElement('canvas');
   cv.width = w; cv.height = h;
@@ -525,6 +485,12 @@ function desenharPronto(fonte, w, h, qualidade) {
   return { mime: 'image/jpeg', dados: completo.split(',')[1], previa: previa };
 }
 
+function comPrazo(p, ms, msg) {
+  return Promise.race([p, new Promise(function (_, erro) {
+    setTimeout(function () { erro(new Error(msg)); }, ms);
+  })]);
+}
+
 function lerBase64(file) {
   return new Promise(function (ok, erro) {
     var fr = new FileReader();
@@ -536,11 +502,7 @@ function lerBase64(file) {
 
 function receberArquivo(input) {
   var file = input.files && input.files[0];
-  limparCamera();
-  if (!file) {
-    marcarErro(input.closest('.campo'), 'O arquivo não chegou. Tente de novo ou use o botão Câmera.');
-    return;
-  }
+  if (!file) return;
 
   var id = input.dataset.arquivo;
   var parte = input.dataset.parte || '';
@@ -738,10 +700,11 @@ function sucesso() {
 var CAM = { stream: null, campo: '', parte: '', frente: false, pronto: null };
 
 function abrirCamera(campo, parte) {
+  if ($('cam')) return;
   var c = campoPorId(campo);
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     marcarErro(document.querySelector('[data-campo="' + campo + '"]'),
-      'Este navegador não libera a câmera para a página. Use o botão Arquivo ou abra o link no Chrome.');
+      'Este navegador não libera a câmera para a página. Abra o link no Chrome.');
     return;
   }
   CAM.campo = campo; CAM.parte = parte; CAM.frente = c.camera === 'user'; CAM.pronto = null;
@@ -759,7 +722,7 @@ function montarTelaCamera(c, parte) {
     '<div class="cam-palco"><video id="camVideo" playsinline autoplay muted></video>' +
       '<img id="camFoto" alt="" hidden>' +
       (CAM.frente ? '' : '<div class="cam-moldura"></div>') + '</div>' +
-    '<div class="cam-barra">' +
+    '<div class="cam-barra" id="camTirar">' +
       '<button type="button" id="camSair">Cancelar</button>' +
       '<button type="button" id="camDisparo" class="cam-disparo" aria-label="Tirar foto"></button>' +
       '<button type="button" id="camVirar">Virar</button>' +
@@ -798,8 +761,8 @@ function ligarStream() {
     var campo = CAM.campo;
     fecharCamera();
     var msg = e && e.name === 'NotAllowedError'
-      ? 'A câmera foi bloqueada. Toque no ícone ao lado do endereço do site, libere a Câmera e tente de novo, ou use o botão Arquivo.'
-      : 'Não consegui abrir a câmera (' + (e && e.name || 'erro') + '). Use o botão Arquivo.';
+      ? 'A câmera foi bloqueada. Toque no ícone ao lado do endereço do site, libere a Câmera e tente de novo.'
+      : 'Não consegui abrir a câmera (' + (e && e.name || 'erro') + '). Feche outros apps que usam a câmera e tente de novo.';
     marcarErro(document.querySelector('[data-campo="' + campo + '"]'), msg);
   });
 }
@@ -813,7 +776,7 @@ function disparar() {
   img.src = 'data:image/jpeg;base64,' + CAM.pronto.dados;
   img.hidden = false; v.hidden = true;
   pararStream();
-  document.querySelector('#cam .cam-barra').hidden = true;
+  $('camTirar').hidden = true;
   $('camConfere').hidden = false;
   $('camDica').textContent = 'Dá para ler tudo? Se estiver tremida ou cortada, tire de novo.';
 }
@@ -821,7 +784,7 @@ function disparar() {
 function repetirFoto() {
   CAM.pronto = null;
   $('camFoto').hidden = true; $('camVideo').hidden = false;
-  document.querySelector('#cam .cam-barra').hidden = false;
+  $('camTirar').hidden = false;
   $('camConfere').hidden = true;
   ligarStream();
 }
@@ -830,8 +793,7 @@ function usarFoto() {
   var pronto = CAM.pronto, campo = CAM.campo, parte = CAM.parte;
   fecharCamera();
   if (!pronto) return;
-  var caixa = document.querySelector('[data-cam="' + campo + '"][data-parte="' + parte + '"]');
-  caixa = caixa && caixa.closest('.foto');
+  var caixa = document.querySelector('.foto[data-cam="' + campo + '"][data-parte="' + parte + '"]');
   if (!caixa) return;
   subirPronto(caixa, campo, parte, Promise.resolve(pronto));
 }
