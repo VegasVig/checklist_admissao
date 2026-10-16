@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function () {
     FICHA = r.ficha;
     ENVIADA = FICHA.status !== 'aguardando';
     var rascunho = window.Rascunho.ler(ID);
-    R = FICHA.dados && Object.keys(FICHA.dados).length ? FICHA.dados : (rascunho || {});
+    R = escolherDados(FICHA, rascunho);
     if (!R.dec_nome && FICHA.rh.candidato) R.dec_nome = FICHA.rh.candidato;
     window.ajustarPorFuncao(FICHA.rh.funcao);
     montar();
@@ -31,6 +31,40 @@ document.addEventListener('DOMContentLoaded', function () {
     falhar('Não foi possível abrir a ficha', e.message +
       ' Se o problema continuar, chame o RH pelo WhatsApp.');
   });
+});
+
+/* o rascunho do celular vence o servidor quando é mais novo: senão uma
+   recarga da página apagava da tela as fotos já enviadas ao Drive */
+function escolherDados(ficha, rascunho) {
+  var servidor = ficha.dados && Object.keys(ficha.dados).length ? ficha.dados : null;
+  var tLocal = (rascunho && rascunho._salvoEm) || 0;
+  var tServ = ficha.enviadaEm ? new Date(ficha.enviadaEm).getTime() || 0 : 0;
+  var r = rascunho && (!servidor || tLocal > tServ) ? rascunho : (servidor || {});
+  delete r._salvoEm;
+  return r;
+}
+
+/* Android costuma matar a aba enquanto o app da câmera está aberto.
+   A marca na sessão sobrevive à recarga e permite avisar o candidato. */
+var CAMERA = 'adm_camera_' + ID;
+function marcarCamera(campo, parte) {
+  try { sessionStorage.setItem(CAMERA, JSON.stringify({ campo: campo, parte: parte || '', t: Date.now() })); } catch (e) {}
+}
+function limparCamera() { try { sessionStorage.removeItem(CAMERA); } catch (e) {} }
+function conferirVoltaDaCamera() {
+  var m = null;
+  try { m = JSON.parse(sessionStorage.getItem(CAMERA)); } catch (e) {}
+  limparCamera();
+  if (!m || Date.now() - m.t > 10 * 60 * 1000) return;
+  var ja = window.arquivosDe(R, m.campo).some(function (a) { return (a.parte || '') === m.parte; });
+  var campo = document.querySelector('[data-campo="' + m.campo + '"]');
+  if (ja || !campo) return;
+  marcarErro(campo, 'O celular recarregou a página enquanto a câmera estava aberta e a foto se perdeu. ' +
+    'Tente de novo. Se repetir, tire a foto pelo app da câmera, volte aqui, toque no campo e escolha a foto na Galeria.');
+  setTimeout(function () { campo.scrollIntoView({ block: 'center' }); }, 300);
+}
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') setTimeout(limparCamera, 4000);
 });
 
 function falhar(titulo, texto) {
@@ -89,6 +123,7 @@ function montar() {
   });
   prepararAssinatura();
   atualizar();
+  conferirVoltaDaCamera();
 }
 
 function primeiroNome(n) { return String(n || '').trim().split(/\s+/)[0] || 'Olá'; }
@@ -215,6 +250,11 @@ function ligarEventos() {
   });
 
   tela.addEventListener('click', function (e) {
+    var vaga = e.target.closest('label.foto.vazia');
+    if (vaga) {
+      var inp = vaga.querySelector('input[data-arquivo]');
+      if (inp) marcarCamera(inp.dataset.arquivo, inp.dataset.parte);
+    }
     var b = e.target.closest('.simnao button');
     if (b) {
       var id = b.parentNode.dataset.id;
@@ -475,6 +515,12 @@ function prepararArquivo(file) {
   });
 }
 
+function comPrazo(p, ms, msg) {
+  return Promise.race([p, new Promise(function (_, erro) {
+    setTimeout(function () { erro(new Error(msg)); }, ms);
+  })]);
+}
+
 function lerBase64(file) {
   return new Promise(function (ok, erro) {
     var fr = new FileReader();
@@ -486,7 +532,11 @@ function lerBase64(file) {
 
 function receberArquivo(input) {
   var file = input.files && input.files[0];
-  if (!file) return;
+  limparCamera();
+  if (!file) {
+    marcarErro(input.closest('.campo'), 'A foto não chegou do app da câmera. Toque de novo; se repetir, escolha a foto na Galeria.');
+    return;
+  }
 
   var id = input.dataset.arquivo;
   var parte = input.dataset.parte || '';
@@ -503,7 +553,7 @@ function receberArquivo(input) {
   caixa.querySelector('.foto-txt b').textContent = 'Preparando…';
   marcarErro(input.closest('.campo'), '');
 
-  prepararArquivo(file).then(function (pronto) {
+  comPrazo(prepararArquivo(file), 20000, 'A foto demorou demais para abrir.').then(function (pronto) {
     caixa.querySelector('.foto-txt b').textContent = 'Enviando…';
     return window.API.enviarArquivo(ID, id, c.rot, parte, pronto).then(function (meta) {
       meta.previa = pronto.previa;

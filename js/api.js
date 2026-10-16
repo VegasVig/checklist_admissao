@@ -142,7 +142,7 @@ window.Rascunho = {
     catch (e) { return null; }
   },
   gravar: function (id, dados) {
-    try { localStorage.setItem(this.chave(id), JSON.stringify(dados)); } catch (e) {}
+    try { localStorage.setItem(this.chave(id), JSON.stringify(Object.assign({}, dados, { _salvoEm: Date.now() }))); } catch (e) {}
   },
   limpar: function (id) { try { localStorage.removeItem(this.chave(id)); } catch (e) {} }
 };
